@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  @apply font-body text-ink-900 bg-surface;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  @apply font-head text-ink-800;
+}
+
+::selection {
+  background: #0F7A6B33;
+}
+
+/* Visible keyboard focus, respected everywhere */
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid #0F7A6B;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+.card {
+  @apply bg-surface-card border border-surface-border rounded;
+}
+
+.btn-primary {
+  @apply bg-teal text-white px-4 py-2 rounded font-medium hover:bg-teal-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-secondary {
+  @apply bg-white border border-surface-border text-ink-800 px-4 py-2 rounded font-medium hover:bg-surface transition-colors disabled:opacity-50;
+}
+
+.input {
+  @apply w-full border border-surface-border rounded px-3 py-2 bg-white text-ink-900 placeholder:text-muted focus:border-teal outline-none;
+}
+
+.label {
+  @apply text-sm font-medium text-ink-700 mb-1 block;
+}
