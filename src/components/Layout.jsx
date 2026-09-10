@@ -64,7 +64,7 @@ export default function Layout({ children }) {
 
       {/* Mobile top bar + drawer */}
       <div className="md:hidden fixed top-0 inset-x-0 z-30 bg-ink-800 text-white flex items-center justify-between px-4 py-3">
-        <p className="font-head font-bold">Meridian</p>
+        <p className="font-head font-bold">Al-Esraa Pharmaceutical Optima</p>
         <button onClick={() => setMobileOpen((v) => !v)} aria-label="Toggle menu" className="p-1">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M4 6h16M4 12h16M4 18h16" />
