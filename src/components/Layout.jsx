@@ -34,7 +34,7 @@ export default function Layout({ children }) {
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-60 bg-ink-800 text-white shrink-0">
         <div className="px-5 py-5 border-b border-white/10">
-          <p className="font-head font-bold text-lg leading-none">Al-Esraa Pharmaceutical Optima</p>
+          <p className="font-head font-bold text-lg leading-none">Meridian</p>
           <p className="text-xs text-white/50 mt-1">Learning &amp; Development</p>
         </div>
         <nav className="flex-1 py-4 px-2 space-y-1">
