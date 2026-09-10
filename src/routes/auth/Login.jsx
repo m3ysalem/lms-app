@@ -31,7 +31,7 @@ export default function Login() {
   return (
     <div className="min-h-screen flex">
       <div className="hidden md:flex w-1/2 bg-ink-800 text-white flex-col justify-between p-12">
-        <p className="font-head font-bold text-xl">Meridian</p>
+        <p className="font-head font-bold text-xl">Al-Esraa Pharmaceutical Optima</p>
         <div>
           <h1 className="font-head text-4xl font-bold leading-tight max-w-sm">
             Training that keeps your whole company moving forward.
