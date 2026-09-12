@@ -302,7 +302,11 @@ export async function addModule(courseId, title, sortOrder) {
     .insert({ course_id: courseId, title, sort_order: sortOrder })
     .select()
     .single()
-  if (error) throw error
+  if (error) {
+    console.error('addModule error details:', error)
+    alert('Failed to add module: ' + error.message)
+    throw error
+  }
   return data
 }
 
@@ -312,7 +316,11 @@ export async function addLesson(moduleId, payload) {
     .insert({ module_id: moduleId, ...payload })
     .select()
     .single()
-  if (error) throw error
+  if (error) {
+    console.error('addLesson error details:', error)
+    alert('Failed to add lesson: ' + error.message)
+    throw error
+  }
   return data
 }
 
