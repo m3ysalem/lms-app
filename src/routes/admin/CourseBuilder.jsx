@@ -9,7 +9,7 @@ export default function CourseBuilder() {
   const { courseId } = useParams()
   const [data, setData] = useState(null)
   const [newModuleTitle, setNewModuleTitle] = useState('')
-  const [lessonForms, setLessonForms] = useState({}) // moduleId -> form state
+  const [lessonForms, setLessonForms] = useState({})
   const [questionForm, setQuestionForm] = useState({ text: '', type: 'multiple_choice', points: 1, answers: [{ text: '', correct: true }, { text: '', correct: false }] })
   const [busy, setBusy] = useState(false)
 
