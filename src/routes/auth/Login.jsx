@@ -18,25 +18,33 @@ export default function Login() {
     setError('')
     setBusy(true)
 
-    // تحويل كود الموظف تلقائياً لبريد إلكتروني معتمد لدى الشركة
-    const loginIdentifier = email.includes('@') 
-      ? email.trim() 
-      : `${email.trim()}@alesraa.com`
+    // إزالة المسافات الزائدة وتحويل اليوزر لـ Email تلقائياً إذا لم يكتب @
+    const rawInput = email.trim()
+    const loginIdentifier = rawInput.includes('@')
+      ? rawInput
+      : `${rawInput}@alesraa.com`
 
-    const { error } = await signIn(loginIdentifier, password)
-    setBusy(false)
-    if (error) {
-      setError(error.message === 'Invalid login credentials'
-        ? 'Employee ID / Email or password is incorrect.'
-        : error.message)
-      return
+    try {
+      const { error } = await signIn(loginIdentifier, password)
+      setBusy(false)
+      if (error) {
+        setError(
+          error.message === 'Invalid login credentials'
+            ? 'Employee ID / Email or password is incorrect.'
+            : error.message
+        )
+        return
+      }
+      navigate('/')
+    } catch (err) {
+      setBusy(false)
+      setError(err.message || 'An unexpected error occurred.')
     }
-    navigate('/')
   }
 
   return (
     <div className="min-h-screen flex bg-[#0d0f12] overflow-hidden">
-      {/* Modern Left Section with Glowing Gradients & Glassmorphism */}
+      {/* Left Banner Section */}
       <div className="hidden md:flex w-7/12 relative bg-[#121519] text-white flex-col justify-between p-12 overflow-hidden border-r border-white/5">
         {/* Glow Effects */}
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-[#9E1B1B]/30 rounded-full blur-[120px] pointer-events-none" />
@@ -62,7 +70,7 @@ export default function Login() {
           </div>
         </div>
 
-        {/* Dynamic Center Content */}
+        {/* Center Content */}
         <div className="relative z-10 max-w-lg my-auto py-12">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-md mb-6">
             <span className="w-2 h-2 rounded-full bg-[#9E1B1B] animate-pulse" />
@@ -77,7 +85,6 @@ export default function Login() {
             Assign interactive courses, track compliance in real-time, and elevate skills across your organization — seamless & automated.
           </p>
 
-          {/* Floating Glass Cards / Metrics */}
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-md">
               <div className="text-2xl font-bold text-white mb-1">100%</div>
@@ -97,7 +104,7 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Right Login Form Section */}
+      {/* Right Form Section */}
       <div className="flex-1 flex items-center justify-center p-8 bg-[#0d0f12] text-white">
         <div className="w-full max-w-md bg-[#161a1e] p-8 sm:p-10 rounded-3xl border border-white/5 shadow-2xl shadow-black/80">
           <div className="mb-8">
