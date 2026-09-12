@@ -108,19 +108,18 @@ export async function getCourseWithStructure(courseId) {
 
     if (courseErr || !course) throw courseErr || new Error('Course not found')
 
-    const { data: modules } = await supabase
+    // جلب الموديولات من الجدول الجديد modules
+    const { data: modules, error: modErr } = await supabase
       .from('modules')
-      .select('*, lessons(*)')
+      .select('*')
       .eq('course_id', courseId)
 
-    const formattedModules = (modules || []).map((m) => {
-      if (m.lessons && Array.isArray(m.lessons)) {
-        m.lessons.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
-      } else {
-        m.lessons = []
-      }
-      return m
-    })
+    if (modErr) console.error('Modules fetch error:', modErr)
+
+    const formattedModules = (modules || []).map((m) => ({
+      ...m,
+      lessons: m.lessons || []
+    }))
 
     const { data: quiz } = await supabase
       .from('quizzes')
@@ -298,7 +297,7 @@ export async function listTrainers() {
 
 export async function addModule(courseId, title, sortOrder) {
   const { data, error } = await supabase
-    .from('modules')
+    .from('modules') // التوجيه للجدول الجديد modules مباشرة
     .insert({ course_id: courseId, title, sort_order: sortOrder })
     .select()
     .single()
