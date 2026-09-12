@@ -10,7 +10,6 @@ export default function Quiz() {
   const { profile } = useAuth()
   const [course, setCourse] = useState(null)
   const [quiz, setQuiz] = useState(null)
-  const [quizState, setQuizState] = useState(null)
   const [questions, setQuestions] = useState([])
   const [attemptId, setAttemptId] = useState(null)
   const [answers, setAnswers] = useState({})
@@ -52,12 +51,26 @@ export default function Quiz() {
     })
   }
 
+  const handleTextAnswer = (questionId, textValue) => {
+    setAnswers((prev) => ({
+      ...prev,
+      [questionId]: textValue
+    }))
+  }
+
   const handleSubmit = async () => {
     setSubmitting(true)
     setError('')
     try {
       const safeQuestions = Array.isArray(questions) ? questions : []
-      const payload = safeQuestions.map((q) => ({ question_id: q.id, selected_answer_ids: answers[q.id] || [] }))
+      const payload = safeQuestions.map((q) => {
+        const isText = q.type === 'text' || q.type === 'essay'
+        return {
+          question_id: q.id,
+          selected_answer_ids: isText ? [] : (answers[q.id] || []),
+          text_answer: isText ? (answers[q.id] || '') : undefined
+        }
+      })
       const res = await submitQuizAttempt(attemptId, payload)
       setResult(res)
       if (res?.passed && course?.certificate_eligible) {
@@ -97,25 +110,38 @@ export default function Quiz() {
           {safeQuestionsList.map((q, i) => {
             const safeAnswers = Array.isArray(q.answers) ? q.answers : []
             const multi = q.type === 'multiple_answer'
+            const isText = q.type === 'text' || q.type === 'essay'
+
             return (
               <div key={q.id || i} className="card p-5">
                 <p className="font-medium text-ink-800 mb-3">{i + 1}. {q.text}</p>
-                <div className="space-y-2">
-                  {safeAnswers.map((a) => {
-                    const checked = (answers[q.id] || []).includes(a.id)
-                    return (
-                      <label key={a.id} className="flex items-center gap-2 text-sm text-ink-700 cursor-pointer">
-                        <input
-                          type={multi ? 'checkbox' : 'radio'}
-                          name={q.id}
-                          checked={checked}
-                          onChange={() => toggleAnswer(q.id, a.id, multi)}
-                        />
-                        {a.text}
-                      </label>
-                    )
-                  })}
-                </div>
+                
+                {isText ? (
+                  <textarea
+                    className="w-full border border-surface-border rounded p-2 text-sm text-ink-700 focus:outline-none focus:border-teal"
+                    rows="3"
+                    placeholder="Type your answer here..."
+                    value={answers[q.id] || ''}
+                    onChange={(e) => handleTextAnswer(q.id, e.target.value)}
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    {safeAnswers.map((a) => {
+                      const checked = (answers[q.id] || []).includes(a.id)
+                      return (
+                        <label key={a.id} className="flex items-center gap-2 text-sm text-ink-700 cursor-pointer">
+                          <input
+                            type={multi ? 'checkbox' : 'radio'}
+                            name={q.id}
+                            checked={checked}
+                            onChange={() => toggleAnswer(q.id, a.id, multi)}
+                          />
+                          {a.text}
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )
           })}
