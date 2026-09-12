@@ -15,32 +15,34 @@ export default function Dashboard() {
   useEffect(() => {
     if (!profile?.id) return
     Promise.all([
-      getMyAssignments(profile.id),
-      getMyProgressMap(profile.id),
-      getMyCertificates(profile.id),
-      getMyNotifications(profile.id),
+      getMyAssignments(profile.id).catch(() => []),
+      getMyProgressMap(profile.id).catch(() => ({})),
+      getMyCertificates(profile.id).catch(() => []),
+      getMyNotifications(profile.id).catch(() => []),
     ])
       .then(([a, p, c, n]) => {
-        setAssignments(a)
-        setProgressMap(p)
-        setCertificates(c)
-        setNotifications(n)
+        setAssignments(a || [])
+        setProgressMap(p || {})
+        setCertificates(c || [])
+        setNotifications(n || [])
       })
       .catch((e) => setError(e.message))
   }, [profile?.id])
 
-  if (error) return <div className="text-danger">{error}</div>
+  if (error) return <div className="text-danger p-4">{error}</div>
   if (!assignments) return <Spinner />
 
-  const inProgress = assignments.filter((a) => a.status === 'in_progress' || a.status === 'started')
-  const completed = assignments.filter((a) => a.status === 'completed')
-  const overdue = assignments.filter((a) => a.status !== 'completed' && a.due_date && new Date(a.due_date) < new Date())
-  const totalHours = Object.values(progressMap).reduce((sum, p) => sum + (p.time_spent_seconds || 0), 0) / 3600
+  const inProgress = assignments.filter((a) => a?.status === 'in_progress' || a?.status === 'started' || a?.status === 'assigned')
+  const completed = assignments.filter((a) => a?.status === 'completed')
+  const overdue = assignments.filter((a) => a?.status !== 'completed' && a?.due_date && new Date(a.due_date) < new Date())
+  const totalHours = Object.values(progressMap).reduce((sum, p) => sum + (p?.time_spent_seconds || 0), 0) / 3600
+
+  const userName = profile?.name || profile?.full_name || 'User'
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold">Welcome back, {profile.full_name?.split(' ')[0]}</h1>
+        <h1 className="text-2xl font-bold">Welcome back, {userName.split(' ')[0]}</h1>
         <p className="text-muted mt-1">Here's where your training stands today.</p>
       </div>
 
@@ -61,16 +63,20 @@ export default function Dashboard() {
         ) : (
           <div className="grid md:grid-cols-2 gap-4">
             {inProgress.map((a) => {
-              const p = progressMap[a.course.id]
+              const courseId = a.course?.id || a.course_id
+              const courseTitle = a.course?.name || a.course?.title || 'Untitled Course'
+              const p = progressMap[courseId]
+              const statusStr = a.status || 'assigned'
+
               return (
-                <Link to={`/courses/${a.course.id}`} key={a.id} className="card p-4 block hover:border-teal transition-colors">
+                <Link to={`/courses/${courseId}`} key={a.id} className="card p-4 block hover:border-teal transition-colors">
                   <div className="flex items-start justify-between">
-                    <p className="font-medium text-ink-800">{a.course.name}</p>
-                    <Badge tone={statusTone(a.status)}>{a.status.replace('_', ' ')}</Badge>
+                    <p className="font-medium text-ink-800">{courseTitle}</p>
+                    <Badge tone={statusTone(statusStr)}>{statusStr.replace('_', ' ')}</Badge>
                   </div>
                   <div className="mt-3">
-                    <ProgressBar percent={p?.progress_percent ?? 0} />
-                    <p className="text-xs text-muted mt-1">{p?.progress_percent ?? 0}% complete</p>
+                    <ProgressBar percent={p?.progress_percent ?? p?.progress ?? 0} />
+                    <p className="text-xs text-muted mt-1">{p?.progress_percent ?? p?.progress ?? 0}% complete</p>
                   </div>
                 </Link>
               )
@@ -83,16 +89,21 @@ export default function Dashboard() {
         <section>
           <h2 className="font-head font-semibold text-lg mb-3">Upcoming deadlines</h2>
           <div className="card divide-y divide-surface-border">
-            {assignments.filter((a) => a.status !== 'completed').slice(0, 5).map((a) => (
-              <div key={a.id} className="p-3 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">{a.course.name}</p>
-                  <p className="text-xs text-muted">{a.due_date ? `Due ${a.due_date}` : 'No due date'}</p>
+            {assignments.filter((a) => a.status !== 'completed').slice(0, 5).map((a) => {
+              const courseTitle = a.course?.name || a.course?.title || 'Untitled Course'
+              const statusStr = a.status || 'assigned'
+
+              return (
+                <div key={a.id} className="p-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{courseTitle}</p>
+                    <p className="text-xs text-muted">{a.due_date ? `Due ${a.due_date}` : 'No due date'}</p>
+                  </div>
+                  <Badge tone={statusTone(statusStr)}>{statusStr.replace('_', ' ')}</Badge>
                 </div>
-                <Badge tone={statusTone(a.status)}>{a.status.replace('_', ' ')}</Badge>
-              </div>
-            ))}
-            {assignments.every((a) => a.status === 'completed') && (
+              )
+            })}
+            {(assignments.length === 0 || assignments.every((a) => a.status === 'completed')) && (
               <p className="p-4 text-sm text-muted">You're all caught up.</p>
             )}
           </div>
@@ -104,8 +115,8 @@ export default function Dashboard() {
             {notifications.length === 0 && <p className="p-4 text-sm text-muted">No notifications yet.</p>}
             {notifications.map((n) => (
               <div key={n.id} className="p-3">
-                <p className="text-sm font-medium">{n.title}</p>
-                <p className="text-xs text-muted mt-0.5">{n.body}</p>
+                <p className="text-sm font-medium">{n.title || n.message || 'Notification'}</p>
+                <p className="text-xs text-muted mt-0.5">{n.body || n.message || ''}</p>
               </div>
             ))}
           </div>
@@ -119,12 +130,17 @@ export default function Dashboard() {
             <Link to="/certificates" className="text-sm text-teal hover:underline">View all</Link>
           </div>
           <div className="flex gap-3 flex-wrap">
-            {certificates.slice(0, 3).map((c) => (
-              <div key={c.id} className="card px-4 py-3">
-                <p className="text-sm font-medium">{c.course.name}</p>
-                <p className="text-xs text-muted">{c.cert_number}</p>
-              </div>
-            ))}
+            {certificates.slice(0, 3).map((c) => {
+              const courseTitle = c.course?.name || c.course?.title || 'Course Certificate'
+              const certCode = c.cert_number || c.certificate_code || 'N/A'
+
+              return (
+                <div key={c.id} className="card px-4 py-3">
+                  <p className="text-sm font-medium">{courseTitle}</p>
+                  <p className="text-xs text-muted">{certCode}</p>
+                </div>
+              )
+            })}
           </div>
         </section>
       )}
