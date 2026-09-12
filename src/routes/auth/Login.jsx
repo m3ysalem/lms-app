@@ -17,11 +17,17 @@ export default function Login() {
     e.preventDefault()
     setError('')
     setBusy(true)
-    const { error } = await signIn(email, password)
+
+    // تحويل كود الموظف تلقائياً لبريد إلكتروني معتمد لدى الشركة
+    const loginIdentifier = email.includes('@') 
+      ? email.trim() 
+      : `${email.trim()}@alesraa.com`
+
+    const { error } = await signIn(loginIdentifier, password)
     setBusy(false)
     if (error) {
       setError(error.message === 'Invalid login credentials'
-        ? 'That email or password is incorrect.'
+        ? 'Employee ID / Email or password is incorrect.'
         : error.message)
       return
     }
@@ -102,14 +108,14 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-xs font-semibold tracking-wider text-gray-300 uppercase mb-2" htmlFor="email">
-                Email or Employee ID
+                Employee ID or Email
               </label>
               <input
                 id="email"
-                type="email"
+                type="text"
                 required
                 className="w-full px-4 py-3.5 rounded-xl bg-[#0d0f12] border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-[#9E1B1B] focus:ring-1 focus:ring-[#9E1B1B] transition-all"
-                placeholder="you@alesraa.com"
+                placeholder="e.g. 1001 or admin"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -165,7 +171,7 @@ export default function Login() {
           </form>
 
           <p className="text-xs text-gray-500 text-center mt-8 pt-6 border-t border-white/5">
-            Test accounts: admin@demo-lms.test · hr@demo-lms.test
+            Default Password: <span className="text-gray-300 font-mono">1234</span>
           </p>
         </div>
       </div>
