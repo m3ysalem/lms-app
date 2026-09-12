@@ -109,7 +109,7 @@ export async function getCourseWithStructure(courseId) {
     if (courseErr || !course) throw courseErr || new Error('Course not found')
 
     const { data: modules } = await supabase
-      .from('course modules')
+      .from('modules')
       .select('*, lessons(*)')
       .eq('course_id', courseId)
 
@@ -298,7 +298,7 @@ export async function listTrainers() {
 
 export async function addModule(courseId, title, sortOrder) {
   const { data, error } = await supabase
-    .from('course modules')
+    .from('modules')
     .insert({ course_id: courseId, title, sort_order: sortOrder })
     .select()
     .single()
