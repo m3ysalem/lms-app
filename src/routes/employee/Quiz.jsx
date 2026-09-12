@@ -9,11 +9,11 @@ export default function Quiz() {
   const { courseId } = useParams()
   const { profile } = useAuth()
   const [course, setCourse] = useState(null)
-  const [quiz, setQuiz] + useState(null)
-  const [quizState, setQuizState] = useState(null) // بديل لتجنب تضارب الأسماء
-  const [questions, setQuestions] = useState([])   // تأمين القيمة بمصفوفة فارغة ابتدائياً
+  const [quiz, setQuiz] = useState(null)
+  const [quizState, setQuizState] = useState(null)
+  const [questions, setQuestions] = useState([])
   const [attemptId, setAttemptId] = useState(null)
-  const [answers, setAnswers] = useState({}) // question_id -> [answer_id,...]
+  const [answers, setAnswers] = useState({})
   const [result, setResult] = useState(null)
   const [certificate, setCertificate] = useState(null)
   const [submitting, setSubmitting] = useState(false)
@@ -36,7 +36,6 @@ export default function Quiz() {
       setAttemptId(attempt.id)
       
       const qs = await getQuizQuestions(quiz.id)
-      // تأمين الأسئلة لضمان أنها مصفوفة دائماً مهما كانت الاستجابة
       setQuestions(Array.isArray(qs) ? qs : [])
     } catch (e) {
       setError(e.message)
