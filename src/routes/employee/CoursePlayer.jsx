@@ -7,6 +7,21 @@ import {
 } from '../../lib/api'
 import { Badge, ProgressBar, Spinner } from '../../components/Ui'
 
+// دالة لتحويل أي رابط يوتيوب لصيغة الـ Embed الصحيحة لمنع مشاكل الرفض
+function getEmbedUrl(url) {
+  if (!url) return ''
+  if (url.includes('embed/')) return url
+
+  let videoId = ''
+  if (url.includes('youtu.be/')) {
+    videoId = url.split('youtu.be/')[1]?.split('?')[0]
+  } else if (url.includes('watch?v=')) {
+    videoId = url.split('watch?v=')[1]?.split('&')[0]
+  }
+
+  return videoId ? `https://www.youtube.com/embed/${videoId}` : url
+}
+
 export default function CoursePlayer() {
   const { courseId } = useParams()
   const { profile } = useAuth()
@@ -121,7 +136,12 @@ export default function CoursePlayer() {
               )}
               {(activeLesson.content_type === 'video' || activeLesson.content_type === 'external_video') && activeLesson.video_url && (
                 <div className="aspect-video bg-ink-900 rounded overflow-hidden mb-4">
-                  <iframe title={activeLesson.title} src={activeLesson.video_url} className="w-full h-full" allowFullScreen />
+                  <iframe 
+                    title={activeLesson.title} 
+                    src={getEmbedUrl(activeLesson.video_url)} 
+                    className="w-full h-full" 
+                    allowFullScreen 
+                  />
                 </div>
               )}
               {activeLesson.content_type === 'external_url' && activeLesson.body && (
