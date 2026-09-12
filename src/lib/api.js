@@ -5,22 +5,17 @@ export async function getMyAssignments(employeeId) {
   try {
     const { data, error } = await supabase
       .from('course_assignments')
-      .select(`
-        id, status, due_date, assigned_date, is_mandatory, course_id,
-        course:course_id ( id, name, title, description, duration_minutes, thumbnail_url, training_type, certificate_eligible, passing_score )
-      `)
+      .select('*, course:course_id(*)')
       .eq('employee_id', employeeId)
-      .order('due_date', { ascending: true })
 
     if (error) {
-      // Fallback in case course relation fails or due_date is missing
-      const { data: fallbackData, error: err2 } = await supabase
+      const { data: fallbackData } = await supabase
         .from('course_assignments')
         .select('*')
         .eq('employee_id', employeeId)
-      if (err2) return []
       return fallbackData || []
     }
+
     return data || []
   } catch (err) {
     console.error('getMyAssignments error:', err)
@@ -51,7 +46,7 @@ export async function getMyCertificates(employeeId) {
   try {
     const { data, error } = await supabase
       .from('certificates')
-      .select('*, course:course_id(name, title)')
+      .select('*, course:course_id(*)')
       .eq('employee_id', employeeId)
 
     if (error) {
