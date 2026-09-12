@@ -2,23 +2,29 @@ import React, { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-const combinedNav = [
+const employeeNav = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/courses', label: 'Courses' },
   { to: '/my-learning', label: 'My Learning' },
   { to: '/certificates', label: 'Certificates' },
   { to: '/profile', label: 'Profile' },
-  { to: '/admin', label: 'Admin Dashboard', end: true },
-  { to: '/admin/employees', label: 'Employees' },
-  { to: '/admin/courses', label: 'Manage Courses' },
-  { to: '/admin/assignments', label: 'Assignments' },
+]
+
+const adminNav = [
+  { to: '/admin', label: 'Dashboard', end: true },
+  { to: '/admin/employees', label: 'Employees', end: true },
+  { to: '/admin/courses', label: 'Courses', end: true },
+  { to: '/admin/assignments', label: 'Assignments', end: true },
 ]
 
 export default function Layout({ children }) {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const nav = combinedNav
+  
+  // التحقق الصحيح من صلاحيات الأدمن بناءً على الـ Role أو الإيميل بشكل دقيق
+  const isAdmin = profile?.role === 'super_admin' || profile?.role === 'hr_admin' || profile?.email === 'admin@alesraa.net'
+  const nav = isAdmin ? adminNav : employeeNav
 
   const handleSignOut = async () => {
     await signOut()
@@ -30,6 +36,7 @@ export default function Layout({ children }) {
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-60 bg-ink-800 text-white shrink-0">
         <div className="px-5 py-5 border-b border-white/10 flex items-center gap-3">
+          {/* Logo Addition */}
           <div className="bg-white/95 p-1.5 rounded-lg shrink-0 shadow-sm">
             <img 
               src="/logo.png" 
@@ -43,7 +50,7 @@ export default function Layout({ children }) {
             <p className="text-[10px] text-white/50 tracking-wider uppercase">Pharmaceutical Optima</p>
           </div>
         </div>
-        <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
+        <nav className="flex-1 py-4 px-2 space-y-1">
           {nav.map((item) => (
             <NavLink
               key={item.to}
@@ -88,7 +95,7 @@ export default function Layout({ children }) {
         </button>
       </div>
       {mobileOpen && (
-        <div className="md:hidden fixed top-12 inset-x-0 z-20 bg-ink-800 text-white px-2 pb-3 max-h-[80vh] overflow-y-auto">
+        <div className="md:hidden fixed top-12 inset-x-0 z-20 bg-ink-800 text-white px-2 pb-3">
           {nav.map((item) => (
             <NavLink
               key={item.to}
