@@ -9,8 +9,9 @@ export default function Quiz() {
   const { courseId } = useParams()
   const { profile } = useAuth()
   const [course, setCourse] = useState(null)
-  const [quiz, setQuiz] = useState(null)
-  const [questions, setQuestions] = useState(null)
+  const [quiz, setQuiz] + useState(null)
+  const [quizState, setQuizState] = useState(null) // بديل لتجنب تضارب الأسماء
+  const [questions, setQuestions] = useState([])   // تأمين القيمة بمصفوفة فارغة ابتدائياً
   const [attemptId, setAttemptId] = useState(null)
   const [answers, setAnswers] = useState({}) // question_id -> [answer_id,...]
   const [result, setResult] = useState(null)
@@ -19,19 +20,24 @@ export default function Quiz() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    getCourseWithStructure(courseId).then(({ course, quiz }) => {
-      setCourse(course)
-      setQuiz(quiz)
-    })
+    getCourseWithStructure(courseId)
+      .then((res) => {
+        setCourse(res?.course || null)
+        setQuiz(res?.quiz || null)
+      })
+      .catch((e) => setError(e.message))
   }, [courseId])
 
   const begin = async () => {
     setError('')
     try {
+      if (!quiz?.id || !profile?.id) return
       const attempt = await startQuizAttempt(profile.id, quiz.id)
       setAttemptId(attempt.id)
+      
       const qs = await getQuizQuestions(quiz.id)
-      setQuestions(qs)
+      // تأمين الأسئلة لضمان أنها مصفوفة دائماً مهما كانت الاستجابة
+      setQuestions(Array.isArray(qs) ? qs : [])
     } catch (e) {
       setError(e.message)
     }
@@ -51,10 +57,11 @@ export default function Quiz() {
     setSubmitting(true)
     setError('')
     try {
-      const payload = questions.map((q) => ({ question_id: q.id, selected_answer_ids: answers[q.id] || [] }))
+      const safeQuestions = Array.isArray(questions) ? questions : []
+      const payload = safeQuestions.map((q) => ({ question_id: q.id, selected_answer_ids: answers[q.id] || [] }))
       const res = await submitQuizAttempt(attemptId, payload)
       setResult(res)
-      if (res.passed && course.certificate_eligible) {
+      if (res?.passed && course?.certificate_eligible) {
         const cert = await issueCertificate(courseId)
         setCertificate(cert)
       }
@@ -67,6 +74,8 @@ export default function Quiz() {
 
   if (!course) return <Spinner />
   if (!quiz) return <p className="text-muted">This course has no quiz configured.</p>
+
+  const safeQuestionsList = Array.isArray(questions) ? questions : []
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -84,30 +93,33 @@ export default function Quiz() {
         </div>
       )}
 
-      {attemptId && !result && questions && (
+      {attemptId && !result && (
         <div className="space-y-5">
-          {questions.map((q, i) => (
-            <div key={q.id} className="card p-5">
-              <p className="font-medium text-ink-800 mb-3">{i + 1}. {q.text}</p>
-              <div className="space-y-2">
-                {q.answers.map((a) => {
-                  const multi = q.type === 'multiple_answer'
-                  const checked = (answers[q.id] || []).includes(a.id)
-                  return (
-                    <label key={a.id} className="flex items-center gap-2 text-sm text-ink-700 cursor-pointer">
-                      <input
-                        type={multi ? 'checkbox' : 'radio'}
-                        name={q.id}
-                        checked={checked}
-                        onChange={() => toggleAnswer(q.id, a.id, multi)}
-                      />
-                      {a.text}
-                    </label>
-                  )
-                })}
+          {safeQuestionsList.map((q, i) => {
+            const safeAnswers = Array.isArray(q.answers) ? q.answers : []
+            const multi = q.type === 'multiple_answer'
+            return (
+              <div key={q.id || i} className="card p-5">
+                <p className="font-medium text-ink-800 mb-3">{i + 1}. {q.text}</p>
+                <div className="space-y-2">
+                  {safeAnswers.map((a) => {
+                    const checked = (answers[q.id] || []).includes(a.id)
+                    return (
+                      <label key={a.id} className="flex items-center gap-2 text-sm text-ink-700 cursor-pointer">
+                        <input
+                          type={multi ? 'checkbox' : 'radio'}
+                          name={q.id}
+                          checked={checked}
+                          onChange={() => toggleAnswer(q.id, a.id, multi)}
+                        />
+                        {a.text}
+                      </label>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
           <button className="btn-primary" disabled={submitting} onClick={handleSubmit}>
             {submitting ? 'Submitting…' : 'Submit quiz'}
           </button>
