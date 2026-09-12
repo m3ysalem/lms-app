@@ -108,7 +108,6 @@ export async function getCourseWithStructure(courseId) {
 
     if (courseErr || !course) throw courseErr || new Error('Course not found')
 
-    // 1. جلب الموديولات وحدها بشكل آمن من جدول modules الجديد
     const { data: modules, error: modErr } = await supabase
       .from('modules')
       .select('*')
@@ -117,7 +116,6 @@ export async function getCourseWithStructure(courseId) {
 
     if (modErr) console.error('Modules fetch error:', modErr)
 
-    // 2. جلب جميع الدروس الخاصة بالموديولات بشكل منفصل وآمن تماماً لتجنب مشاكل الـ Foreign Key
     const moduleIds = (modules || []).map(m => m.id)
     let allLessons = []
     if (moduleIds.length > 0) {
@@ -128,7 +126,6 @@ export async function getCourseWithStructure(courseId) {
       allLessons = lessonsData || []
     }
 
-    // 3. دمج الموديولات مع دروسها برمجياً
     const formattedModules = (modules || []).map((m) => ({
       ...m,
       lessons: allLessons.filter(l => l.module_id === m.id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
@@ -220,27 +217,56 @@ export async function startQuizAttempt(employeeId, quizId) {
 export async function getQuizQuestions(quizId) {
   try {
     const { data, error } = await supabase.rpc('get_quiz_for_attempt', { p_quiz_id: quizId })
-    if (error) {
-      console.error('getQuizQuestions rpc error:', error)
-      return []
+    
+    let rows = []
+    if (!error && Array.isArray(data) && data.length > 0) {
+      rows = data
+    } else {
+      const { data: qData, error: qError } = await supabase
+        .from('quiz_questions')
+        .select('*')
+        .eq('quiz_id', quizId)
+
+      if (!qError && qData && qData.length > 0) {
+        const questionIds = qData.map(q => q.id)
+        const { data: aData } = await supabase
+          .from('quiz_answers')
+          .select('*')
+          .in('question_id', questionIds)
+
+        const answersList = aData || []
+        
+        return qData.map(q => ({
+          id: q.id,
+          text: q.text || q.question_text,
+          type: q.type || q.question_type || 'single_choice',
+          points: q.points || 1,
+          answers: answersList
+            .filter(a => a.question_id === q.id)
+            .map(a => ({ id: a.id, text: a.answer_text || a.text }))
+        }))
+      }
     }
-    
-    // تأمين البيانات والتأكد من أنها مصفوفة وليست null
-    const rows = Array.isArray(data) ? data : []
+
     const map = new Map()
-    
     for (const row of rows) {
-      if (row && row.question_id && !map.has(row.question_id)) {
-        map.set(row.question_id, {
-          id: row.question_id,
-          text: row.question_text,
-          type: row.question_type,
-          points: row.points,
+      const qId = row.question_id || row.id
+      const qText = row.question_text || row.text
+      const qType = row.question_type || row.type
+      const aId = row.answer_id || row.answerId
+      const aText = row.answer_text || row.answerText
+
+      if (qId && !map.has(qId)) {
+        map.set(qId, {
+          id: qId,
+          text: qText,
+          type: qType,
+          points: row.points || 1,
           answers: [],
         })
       }
-      if (row && row.question_id && row.answer_id) {
-        map.get(row.question_id).answers.push({ id: row.answer_id, text: row.answer_text })
+      if (qId && aId) {
+        map.get(qId).answers.push({ id: aId, text: aText })
       }
     }
     return Array.from(map.values())
