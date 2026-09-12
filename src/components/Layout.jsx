@@ -37,33 +37,36 @@ export default function Layout({ children }) {
   }
 
   return (
-    <div className="min-h-screen flex bg-surface">
+    <div className="min-h-screen flex bg-[#f4f6f9]">
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex flex-col w-64 bg-ink-800 text-white shrink-0 shadow-2xl border-r border-white/5">
-        <div className="px-6 py-6 border-b border-white/10 flex items-center gap-3 bg-ink-900/40">
-          <div className="bg-white p-2 rounded-xl shrink-0 shadow-md ring-2 ring-teal/20">
+      <aside className="hidden md:flex flex-col w-64 bg-[#14171A] text-white shrink-0 shadow-2xl border-r border-white/10">
+        {/* Logo Section */}
+        <div className="px-6 py-6 border-b border-white/10 flex items-center gap-3.5 bg-[#101214]">
+          <div className="bg-white p-2 rounded-xl shrink-0 shadow-lg">
             <img 
               src="/logo.png" 
               alt="Logo" 
-              className="h-7 w-auto object-contain" 
+              className="h-8 w-auto object-contain" 
               onError={(e) => { e.target.parentElement.style.display = 'none' }}
             />
           </div>
           <div>
-            <p className="font-head font-bold text-base leading-tight tracking-wide text-white">Al-Esraa</p>
-            <p className="text-[10px] text-teal-light font-semibold tracking-widest uppercase mt-0.5">Pharmaceutical Optima</p>
+            <p className="font-head font-extrabold text-base leading-tight tracking-wide text-white">Al-Esraa</p>
+            <p className="text-[10px] text-[#9E1B1B] font-bold tracking-widest uppercase mt-0.5">Optima</p>
           </div>
         </div>
-        <nav className="flex-1 py-5 px-3 space-y-1.5 overflow-y-auto">
+
+        {/* Navigation Tabs */}
+        <nav className="flex-1 py-6 px-3 space-y-1.5 overflow-y-auto">
           {nav.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.end}
               className={({ isActive }) =>
-                `block px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                `block px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300 ${
                   isActive 
-                    ? 'bg-teal text-white shadow-md shadow-teal/30 translate-x-1' 
+                    ? 'bg-[#9E1B1B] text-white shadow-lg shadow-[#9E1B1B]/40 translate-x-1' 
                     : 'text-white/70 hover:bg-white/10 hover:text-white'
                 }`
               }
@@ -72,12 +75,14 @@ export default function Layout({ children }) {
             </NavLink>
           ))}
         </nav>
-        <div className="p-4 m-3 rounded-xl bg-ink-900/60 border border-white/10 shadow-inner">
-          <p className="text-sm font-semibold truncate text-white">{profile?.full_name}</p>
-          <p className="text-xs text-muted truncate mb-3">{profile?.employee_code || profile?.email}</p>
+
+        {/* User Profile & Logout Box */}
+        <div className="p-4 m-3 rounded-xl bg-white/5 border border-white/10 shadow-inner">
+          <p className="text-sm font-bold truncate text-white">{profile?.full_name}</p>
+          <p className="text-xs text-white/40 truncate mb-3">{profile?.employee_code || profile?.email}</p>
           <button 
             onClick={handleSignOut} 
-            className="w-full py-2 px-3 rounded-lg bg-white/5 hover:bg-teal hover:text-white text-xs text-white/80 transition-all text-center font-medium border border-white/10"
+            className="w-full py-2 px-3 rounded-lg bg-white/10 hover:bg-[#9E1B1B] text-xs text-white transition-all text-center font-bold tracking-wide border border-white/10 shadow-sm"
           >
             Sign out
           </button>
@@ -85,9 +90,9 @@ export default function Layout({ children }) {
       </aside>
 
       {/* Mobile top bar + drawer */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-30 bg-ink-800 text-white flex items-center justify-between px-4 py-3 border-b border-white/10 shadow-md">
+      <div className="md:hidden fixed top-0 inset-x-0 z-30 bg-[#14171A] text-white flex items-center justify-between px-4 py-3 border-b border-white/10 shadow-md">
         <div className="flex items-center gap-2.5">
-          <div className="bg-white p-1.5 rounded-lg shrink-0 shadow-sm">
+          <div className="bg-white p-1.5 rounded-lg shrink-0">
             <img 
               src="/logo.png" 
               alt="Logo" 
@@ -97,17 +102,18 @@ export default function Layout({ children }) {
           </div>
           <div>
             <p className="font-head font-bold text-sm leading-tight">Al-Esraa</p>
-            <p className="text-[9px] text-teal-light uppercase tracking-wider">Optima</p>
+            <p className="text-[9px] text-[#9E1B1B] uppercase tracking-wider font-bold">Optima</p>
           </div>
         </div>
-        <button onClick={() => setMobileOpen((v) => !v)} aria-label="Toggle menu" className="p-1.5 rounded-lg bg-white/10 text-white">
+        <button onClick={() => setMobileOpen((v) => !v)} aria-label="Toggle menu" className="p-2 rounded-lg bg-white/10 text-white">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
       </div>
+
       {mobileOpen && (
-        <div className="md:hidden fixed top-14 inset-x-0 z-20 bg-ink-800 text-white px-3 py-4 max-h-[80vh] overflow-y-auto border-b border-white/10 shadow-2xl space-y-1">
+        <div className="md:hidden fixed top-14 inset-x-0 z-20 bg-[#14171A] text-white px-3 py-4 max-h-[80vh] overflow-y-auto border-b border-white/10 shadow-2xl space-y-1.5">
           {nav.map((item) => (
             <NavLink
               key={item.to}
@@ -115,8 +121,8 @@ export default function Layout({ children }) {
               end={item.end}
               onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
-                `block px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  isActive ? 'bg-teal text-white shadow' : 'text-white/70 hover:bg-white/10'
+                `block px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                  isActive ? 'bg-[#9E1B1B] text-white shadow' : 'text-white/70 hover:bg-white/10'
                 }`
               }
             >
@@ -126,7 +132,7 @@ export default function Layout({ children }) {
           <div className="pt-3 mt-3 border-t border-white/10">
             <button 
               onClick={handleSignOut} 
-              className="block w-full py-2 px-3 text-center rounded-lg bg-teal/20 text-white text-sm font-medium border border-teal/30"
+              className="block w-full py-2.5 px-3 text-center rounded-xl bg-[#9E1B1B] text-white text-sm font-bold shadow-md"
             >
               Sign out
             </button>
@@ -134,7 +140,8 @@ export default function Layout({ children }) {
         </div>
       )}
 
-      <main className="flex-1 min-w-0 pt-16 md:pt-0 bg-surface">
+      {/* Main Content Area */}
+      <main className="flex-1 min-w-0 pt-16 md:pt-0 bg-[#f4f6f9]">
         <div className="max-w-6xl mx-auto p-4 md:p-8">{children}</div>
       </main>
     </div>
