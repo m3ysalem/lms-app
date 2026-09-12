@@ -218,22 +218,36 @@ export async function startQuizAttempt(employeeId, quizId) {
 }
 
 export async function getQuizQuestions(quizId) {
-  const { data, error } = await supabase.rpc('get_quiz_for_attempt', { p_quiz_id: quizId })
-  if (error) throw error
-  const map = new Map()
-  for (const row of data || []) {
-    if (!map.has(row.question_id)) {
-      map.set(row.question_id, {
-        id: row.question_id,
-        text: row.question_text,
-        type: row.question_type,
-        points: row.points,
-        answers: [],
-      })
+  try {
+    const { data, error } = await supabase.rpc('get_quiz_for_attempt', { p_quiz_id: quizId })
+    if (error) {
+      console.error('getQuizQuestions rpc error:', error)
+      return []
     }
-    map.get(row.question_id).answers.push({ id: row.answer_id, text: row.answer_text })
+    
+    // تأمين البيانات والتأكد من أنها مصفوفة وليست null
+    const rows = Array.isArray(data) ? data : []
+    const map = new Map()
+    
+    for (const row of rows) {
+      if (row && row.question_id && !map.has(row.question_id)) {
+        map.set(row.question_id, {
+          id: row.question_id,
+          text: row.question_text,
+          type: row.question_type,
+          points: row.points,
+          answers: [],
+        })
+      }
+      if (row && row.question_id && row.answer_id) {
+        map.get(row.question_id).answers.push({ id: row.answer_id, text: row.answer_text })
+      }
+    }
+    return Array.from(map.values())
+  } catch (err) {
+    console.error('getQuizQuestions exception:', err)
+    return []
   }
-  return Array.from(map.values())
 }
 
 export async function submitQuizAttempt(attemptId, answers) {
