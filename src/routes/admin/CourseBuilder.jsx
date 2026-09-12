@@ -10,7 +10,13 @@ export default function CourseBuilder() {
   const [data, setData] = useState(null)
   const [newModuleTitle, setNewModuleTitle] = useState('')
   const [lessonForms, setLessonForms] = useState({})
-  const [questionForm, setQuestionForm] = useState({ text: '', type: 'multiple_choice', points: 1, answers: [{ text: '', correct: true }, { text: '', correct: false }] })
+  const [questionForm, setQuestionForm] = useState({ 
+    text: '', 
+    type: 'multiple_choice', 
+    points: 1, 
+    correct_answer_text: '', 
+    answers: [{ text: '', correct: true }, { text: '', correct: false }] 
+  })
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(() => {
@@ -88,17 +94,32 @@ export default function CourseBuilder() {
   }
 
   const createQuestion = async () => {
-    if (!questionForm.text.trim() || questionForm.answers.some((a) => !a.text.trim())) return
+    const isText = questionForm.type === 'text' || questionForm.type === 'essay'
+    if (!questionForm.text.trim()) return
+    if (!isText && questionForm.answers.some((a) => !a.text.trim())) return
+    if (isText && !questionForm.correct_answer_text.trim()) return
+
     try {
       setBusy(true)
       const q = await addQuestion(quiz.id, {
         question_text: questionForm.text,
         question_type: questionForm.type,
         points: Number(questionForm.points) || 1,
+        correct_answer_text: isText ? questionForm.correct_answer_text : '',
         sort_order: 0,
       })
-      await addAnswers(q.id, questionForm.answers)
-      setQuestionForm({ text: '', type: 'multiple_choice', points: 1, answers: [{ text: '', correct: true }, { text: '', correct: false }] })
+      
+      if (!isText) {
+        await addAnswers(q.id, questionForm.answers)
+      }
+
+      setQuestionForm({ 
+        text: '', 
+        type: 'multiple_choice', 
+        points: 1, 
+        correct_answer_text: '', 
+        answers: [{ text: '', correct: true }, { text: '', correct: false }] 
+      })
       load()
     } catch (err) {
       alert('Failed to add question: ' + err.message)
@@ -186,44 +207,62 @@ export default function CourseBuilder() {
                   <option value="multiple_choice">Multiple choice</option>
                   <option value="true_false">True / False</option>
                   <option value="multiple_answer">Multiple answer</option>
+                  <option value="text">Text / Essay</option>
                 </select>
                 <input className="input" type="number" min={1} value={questionForm.points} onChange={(e) => setQuestionForm({ ...questionForm, points: e.target.value })} />
               </div>
-              <p className="label">Answers (check the correct one(s))</p>
-              {questionForm.answers.map((a, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <input
-                    type={questionForm.type === 'multiple_answer' ? 'checkbox' : 'radio'}
-                    checked={a.correct}
-                    onChange={() => {
-                      const answers = questionForm.answers.map((x, xi) =>
-                        questionForm.type === 'multiple_answer'
-                          ? (xi === i ? { ...x, correct: !x.correct } : x)
-                          : { ...x, correct: xi === i }
-                      )
-                      setQuestionForm({ ...questionForm, answers })
-                    }}
-                  />
-                  <input
-                    className="input"
-                    placeholder={`Answer ${i + 1}`}
-                    value={a.text}
-                    onChange={(e) => {
-                      const answers = [...questionForm.answers]
-                      answers[i] = { ...answers[i], text: e.target.value }
-                      setQuestionForm({ ...questionForm, answers })
-                    }}
+
+              {(questionForm.type === 'text' || questionForm.type === 'essay') ? (
+                <div className="space-y-1 mt-2">
+                  <label className="label">Correct Answer (Model Answer for evaluation)</label>
+                  <textarea 
+                    className="input" 
+                    rows={2} 
+                    placeholder="Type the correct model answer here..." 
+                    value={questionForm.correct_answer_text} 
+                    onChange={(e) => setQuestionForm({ ...questionForm, correct_answer_text: e.target.value })} 
                   />
                 </div>
-              ))}
-              <button
-                type="button"
-                className="text-teal text-sm hover:underline"
-                onClick={() => setQuestionForm({ ...questionForm, answers: [...questionForm.answers, { text: '', correct: false }] })}
-              >
-                + Add answer option
-              </button>
-              <div>
+              ) : (
+                <>
+                  <p className="label">Answers (check the correct one(s))</p>
+                  {questionForm.answers.map((a, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        type={questionForm.type === 'multiple_answer' ? 'checkbox' : 'radio'}
+                        checked={a.correct}
+                        onChange={() => {
+                          const answers = questionForm.answers.map((x, xi) =>
+                            questionForm.type === 'multiple_answer'
+                              ? (xi === i ? { ...x, correct: !x.correct } : x)
+                              : { ...x, correct: xi === i }
+                          )
+                          setQuestionForm({ ...questionForm, answers })
+                        }}
+                      />
+                      <input
+                        className="input"
+                        placeholder={`Answer ${i + 1}`}
+                        value={a.text}
+                        onChange={(e) => {
+                          const answers = [...questionForm.answers]
+                          answers[i] = { ...answers[i], text: e.target.value }
+                          setQuestionForm({ ...questionForm, answers })
+                        }}
+                      />
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className="text-teal text-sm hover:underline"
+                    onClick={() => setQuestionForm({ ...questionForm, answers: [...questionForm.answers, { text: '', correct: false }] })}
+                  >
+                    + Add answer option
+                  </button>
+                </>
+              )}
+
+              <div className="pt-2">
                 <button type="button" className="btn-primary" disabled={busy} onClick={createQuestion}>Add question</button>
               </div>
             </div>
