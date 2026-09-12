@@ -108,18 +108,30 @@ export async function getCourseWithStructure(courseId) {
 
     if (courseErr || !course) throw courseErr || new Error('Course not found')
 
-    // جلب الموديولات مع الدروس المرتبطة بها وترتيبها
+    // 1. جلب الموديولات وحدها بشكل آمن من جدول modules الجديد
     const { data: modules, error: modErr } = await supabase
       .from('modules')
-      .select('*, lessons(*)')
+      .select('*')
       .eq('course_id', courseId)
       .order('sort_order', { ascending: true })
 
     if (modErr) console.error('Modules fetch error:', modErr)
 
+    // 2. جلب جميع الدروس الخاصة بالموديولات بشكل منفصل وآمن تماماً لتجنب مشاكل الـ Foreign Key
+    const moduleIds = (modules || []).map(m => m.id)
+    let allLessons = []
+    if (moduleIds.length > 0) {
+      const { data: lessonsData } = await supabase
+        .from('lessons')
+        .select('*')
+        .in('module_id', moduleIds)
+      allLessons = lessonsData || []
+    }
+
+    // 3. دمج الموديولات مع دروسها برمجياً
     const formattedModules = (modules || []).map((m) => ({
       ...m,
-      lessons: (m.lessons || []).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+      lessons: allLessons.filter(l => l.module_id === m.id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
     }))
 
     const { data: quiz } = await supabase
