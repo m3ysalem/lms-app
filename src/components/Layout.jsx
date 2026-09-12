@@ -33,9 +33,20 @@ export default function Layout({ children }) {
     <div className="min-h-screen flex bg-surface">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-60 bg-ink-800 text-white shrink-0">
-        <div className="px-5 py-5 border-b border-white/10">
-          <p className="font-head font-bold text-lg leading-none">Al-Esraa Pharmaceutical Optima</p>
-          <p className="text-xs text-white/50 mt-1">Learning &amp; Development</p>
+        <div className="px-5 py-5 border-b border-white/10 flex items-center gap-3">
+          {/* Logo Addition */}
+          <div className="bg-white/95 p-1.5 rounded-lg shrink-0 shadow-sm">
+            <img 
+              src="/logo.png" 
+              alt="Logo" 
+              className="h-7 w-auto object-contain" 
+              onError={(e) => { e.target.parentElement.style.display = 'none' }}
+            />
+          </div>
+          <div>
+            <p className="font-head font-bold text-base leading-snug">Al-Esraa</p>
+            <p className="text-[10px] text-white/50 tracking-wider uppercase">Pharmaceutical Optima</p>
+          </div>
         </div>
         <nav className="flex-1 py-4 px-2 space-y-1">
           {nav.map((item) => (
@@ -63,8 +74,18 @@ export default function Layout({ children }) {
       </aside>
 
       {/* Mobile top bar + drawer */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-30 bg-ink-800 text-white flex items-center justify-between px-4 py-3">
-        <p className="font-head font-bold">Al-Esraa Pharmaceutical Optima</p>
+      <div className="md:hidden fixed top-0 inset-x-0 z-30 bg-ink-800 text-white flex items-center justify-between px-4 py-3 border-b border-white/10">
+        <div className="flex items-center gap-2">
+          <div className="bg-white/95 p-1 rounded shrink-0">
+            <img 
+              src="/logo.png" 
+              alt="Logo" 
+              className="h-6 w-auto object-contain" 
+              onError={(e) => { e.target.parentElement.style.display = 'none' }}
+            />
+          </div>
+          <p className="font-head font-bold text-sm">Al-Esraa Optima</p>
+        </div>
         <button onClick={() => setMobileOpen((v) => !v)} aria-label="Toggle menu" className="p-1">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M4 6h16M4 12h16M4 18h16" />
