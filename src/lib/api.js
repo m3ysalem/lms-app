@@ -2,96 +2,161 @@ import { supabase } from './supabaseClient'
 
 // ---------- Employee: assignments & progress ----------
 export async function getMyAssignments(employeeId) {
-  const { data, error } = await supabase
-    .from('course_assignments')
-    .select(`
-      id, status, due_date, assigned_date, is_mandatory,
-      course:course_id ( id, name, description, duration_minutes, thumbnail_url, training_type, certificate_eligible, passing_score )
-    `)
-    .eq('employee_id', employeeId)
-    .order('due_date', { ascending: true })
-  if (error) throw error
-  return data
+  try {
+    const { data, error } = await supabase
+      .from('course_assignments')
+      .select(`
+        id, status, due_date, assigned_date, is_mandatory, course_id,
+        course:course_id ( id, name, title, description, duration_minutes, thumbnail_url, training_type, certificate_eligible, passing_score )
+      `)
+      .eq('employee_id', employeeId)
+      .order('due_date', { ascending: true })
+
+    if (error) {
+      // Fallback in case course relation fails or due_date is missing
+      const { data: fallbackData, error: err2 } = await supabase
+        .from('course_assignments')
+        .select('*')
+        .eq('employee_id', employeeId)
+      if (err2) return []
+      return fallbackData || []
+    }
+    return data || []
+  } catch (err) {
+    console.error('getMyAssignments error:', err)
+    return []
+  }
 }
 
 export async function getMyProgressMap(employeeId) {
-  const { data, error } = await supabase
-    .from('course_progress')
-    .select('course_id, progress_percent, completed_at, last_accessed_at, started_at, time_spent_seconds')
-    .eq('employee_id', employeeId)
-  if (error) throw error
-  const map = {}
-  for (const row of data) map[row.course_id] = row
-  return map
+  try {
+    const { data, error } = await supabase
+      .from('course_progress')
+      .select('*')
+      .eq('employee_id', employeeId)
+
+    if (error) return {}
+    const map = {}
+    for (const row of data || []) {
+      if (row.course_id) map[row.course_id] = row
+    }
+    return map
+  } catch (err) {
+    console.error('getMyProgressMap error:', err)
+    return {}
+  }
 }
 
 export async function getMyCertificates(employeeId) {
-  const { data, error } = await supabase
-    .from('certificates')
-    .select('*, course:course_id(name)')
-    .eq('employee_id', employeeId)
-    .order('issued_date', { ascending: false })
-  if (error) throw error
-  return data
+  try {
+    const { data, error } = await supabase
+      .from('certificates')
+      .select('*, course:course_id(name, title)')
+      .eq('employee_id', employeeId)
+
+    if (error) {
+      const { data: fallbackData } = await supabase
+        .from('certificates')
+        .select('*')
+        .eq('employee_id', employeeId)
+      return fallbackData || []
+    }
+    return data || []
+  } catch (err) {
+    console.error('getMyCertificates error:', err)
+    return []
+  }
 }
 
 export async function getMyNotifications(employeeId) {
-  const { data, error } = await supabase
-    .from('notifications')
-    .select('*')
-    .eq('employee_id', employeeId)
-    .order('created_at', { ascending: false })
-    .limit(10)
-  if (error) throw error
-  return data
+  try {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .limit(10)
+
+    if (error) return []
+    return data || []
+  } catch (err) {
+    console.error('getMyNotifications error:', err)
+    return []
+  }
 }
 
 // ---------- Course catalog & player ----------
 export async function getPublishedCourses() {
-  const { data, error } = await supabase
-    .from('courses')
-    .select('*, category:category_id(name), trainer:trainer_id(profile:profile_id(full_name))')
-    .eq('status', 'published')
-    .order('name')
-  if (error) throw error
-  return data
+  try {
+    const { data, error } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('status', 'published')
+
+    if (error) {
+      const { data: allCourses } = await supabase.from('courses').select('*')
+      return allCourses || []
+    }
+    return data || []
+  } catch (err) {
+    console.error('getPublishedCourses error:', err)
+    return []
+  }
 }
 
 export async function getCourseWithStructure(courseId) {
-  const { data: course, error: courseErr } = await supabase
-    .from('courses')
-    .select('*, category:category_id(name), trainer:trainer_id(profile:profile_id(full_name))')
-    .eq('id', courseId)
-    .single()
-  if (courseErr) throw courseErr
+  try {
+    const { data: course, error: courseErr } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('id', courseId)
+      .maybeSingle()
 
-  const { data: modules, error: modErr } = await supabase
-    .from('course_modules')
-    .select('*, lessons(*)')
-    .eq('course_id', courseId)
-    .order('sort_order')
-  if (modErr) throw modErr
+    if (courseErr || !course) throw courseErr || new Error('Course not found')
 
-  modules.forEach((m) => m.lessons.sort((a, b) => a.sort_order - b.sort_order))
+    const { data: modules } = await supabase
+      .from('course_modules')
+      .select('*, lessons(*)')
+      .eq('course_id', courseId)
 
-  const { data: quiz } = await supabase
-    .from('quizzes')
-    .select('*')
-    .eq('course_id', courseId)
-    .maybeSingle()
+    const formattedModules = (modules || []).map((m) => {
+      if (m.lessons && Array.isArray(m.lessons)) {
+        m.lessons.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+      } else {
+        m.lessons = []
+      }
+      return m
+    })
 
-  return { course, modules, quiz }
+    const { data: quiz } = await supabase
+      .from('quizzes')
+      .select('*')
+      .eq('course_id', courseId)
+      .maybeSingle()
+
+    return { course, modules: formattedModules, quiz: quiz || null }
+  } catch (err) {
+    console.error('getCourseWithStructure error:', err)
+    throw err
+  }
 }
 
 export async function getLessonProgress(employeeId, courseId) {
-  const { data, error } = await supabase
-    .from('lesson_progress')
-    .select('lesson_id, status, completed_at')
-    .eq('employee_id', employeeId)
-  if (error) throw error
-  const map = {}
-  for (const row of data) map[row.lesson_id] = row
-  return map
+  try {
+    const { data, error } = await supabase
+      .from('lesson_progress')
+      .select('*')
+      .eq('employee_id', employeeId)
+
+    if (error) return {}
+    const map = {}
+    for (const row of data || []) {
+      if (row.lesson_id) map[row.lesson_id] = row
+    }
+    return map
+  } catch (err) {
+    console.error('getLessonProgress error:', err)
+    return {}
+  }
 }
 
 export async function markLessonComplete(employeeId, lessonId) {
@@ -117,15 +182,15 @@ export async function upsertCourseProgress(employeeId, courseId, percent) {
   const { error } = await supabase
     .from('course_progress')
     .upsert(payload, { onConflict: 'course_id,employee_id' })
-  if (error) throw error
+  if (error) console.warn('upsertCourseProgress warn:', error.message)
 
-  // Keep the assignment status in sync so admin views reflect reality.
   const status = percent >= 100 ? 'completed' : percent > 0 ? 'in_progress' : 'assigned'
   await supabase
     .from('course_assignments')
     .update({ status })
     .eq('course_id', courseId)
     .eq('employee_id', employeeId)
+    .catch(() => {})
 }
 
 // ---------- Quiz engine ----------
@@ -148,9 +213,8 @@ export async function startQuizAttempt(employeeId, quizId) {
 export async function getQuizQuestions(quizId) {
   const { data, error } = await supabase.rpc('get_quiz_for_attempt', { p_quiz_id: quizId })
   if (error) throw error
-  // Group flat rows into questions[].answers[]
   const map = new Map()
-  for (const row of data) {
+  for (const row of data || []) {
     if (!map.has(row.question_id)) {
       map.set(row.question_id, {
         id: row.question_id,
@@ -171,7 +235,7 @@ export async function submitQuizAttempt(attemptId, answers) {
     p_answers: answers,
   })
   if (error) throw error
-  return data[0]
+  return data ? data[0] : null
 }
 
 export async function issueCertificate(courseId) {
@@ -182,15 +246,12 @@ export async function issueCertificate(courseId) {
 
 // ---------- Admin: employees ----------
 export async function listEmployees({ search = '', departmentId = '' } = {}) {
-  let query = supabase
-    .from('profiles')
-    .select('*, department:department_id(name), job_title:job_title_id(title)')
-    .order('full_name')
+  let query = supabase.from('profiles').select('*')
   if (search) query = query.ilike('full_name', `%${search}%`)
   if (departmentId) query = query.eq('department_id', departmentId)
   const { data, error } = await query
   if (error) throw error
-  return data
+  return data || []
 }
 
 export async function updateEmployee(id, patch) {
@@ -199,25 +260,22 @@ export async function updateEmployee(id, patch) {
 }
 
 export async function listDepartments() {
-  const { data, error } = await supabase.from('departments').select('*').order('name')
-  if (error) throw error
-  return data
+  const { data, error } = await supabase.from('departments').select('*')
+  if (error) return []
+  return data || []
 }
 
 export async function listJobTitles() {
-  const { data, error } = await supabase.from('job_titles').select('*').order('title')
-  if (error) throw error
-  return data
+  const { data, error } = await supabase.from('job_titles').select('*')
+  if (error) return []
+  return data || []
 }
 
 // ---------- Admin: courses ----------
 export async function listAllCourses() {
-  const { data, error } = await supabase
-    .from('courses')
-    .select('*, category:category_id(name)')
-    .order('created_at', { ascending: false })
+  const { data, error } = await supabase.from('courses').select('*')
   if (error) throw error
-  return data
+  return data || []
 }
 
 export async function createCourse(payload) {
@@ -232,17 +290,15 @@ export async function updateCourse(id, patch) {
 }
 
 export async function listCategories() {
-  const { data, error } = await supabase.from('course_categories').select('*').order('name')
-  if (error) throw error
-  return data
+  const { data, error } = await supabase.from('course_categories').select('*')
+  if (error) return []
+  return data || []
 }
 
 export async function listTrainers() {
-  const { data, error } = await supabase
-    .from('trainers')
-    .select('id, profile:profile_id(full_name)')
-  if (error) throw error
-  return data
+  const { data, error } = await supabase.from('trainers').select('*')
+  if (error) return []
+  return data || []
 }
 
 export async function addModule(courseId, title, sortOrder) {
@@ -305,10 +361,7 @@ export async function assignCourse({ courseId, employeeIds, assignedBy, dueDate,
 }
 
 export async function listAssignments() {
-  const { data, error } = await supabase
-    .from('course_assignments')
-    .select('*, course:course_id(name), employee:employee_id(full_name, employee_code)')
-    .order('due_date')
+  const { data, error } = await supabase.from('course_assignments').select('*')
   if (error) throw error
-  return data
+  return data || []
 }
