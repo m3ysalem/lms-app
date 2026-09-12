@@ -21,7 +21,7 @@ export default function Layout({ children }) {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const isAdmin = profile?.role === 'super_admin' || profile?.role === 'hr_admin'
+  const isAdmin = profile?.role === 'super_admin' || profile?.role === 'hr_admin' || profile?.email === 'admin@alesraa.net'
   const nav = isAdmin ? adminNav : employeeNav
 
   const handleSignOut = async () => {
