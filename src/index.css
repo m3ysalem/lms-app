@@ -7,21 +7,24 @@ html, body, #root {
 }
 
 body {
-  @apply font-body text-ink-900 bg-surface;
+  font-family: "IBM Plex Sans", sans-serif;
+  color: #111315;
+  background-color: #F8F9FA;
   -webkit-font-smoothing: antialiased;
 }
 
 h1, h2, h3, h4 {
-  @apply font-head text-ink-800;
+  font-family: Manrope, sans-serif;
+  color: #1A1D20;
 }
 
 ::selection {
-  background: #0F7A6B33;
+  background: #9E1B1B33;
 }
 
 /* Visible keyboard focus, respected everywhere */
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
-  outline: 2px solid #0F7A6B;
+  outline: 2px solid #9E1B1B;
   outline-offset: 2px;
 }
 
@@ -30,21 +33,69 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .card {
-  @apply bg-surface-card border border-surface-border rounded;
+  background-color: #FFFFFF;
+  border: 1px solid #E3E6EC;
+  border-radius: 6px;
 }
 
 .btn-primary {
-  @apply bg-teal text-white px-4 py-2 rounded font-medium hover:bg-teal-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  background-color: #9E1B1B;
+  color: #FFFFFF;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.btn-primary:hover {
+  background-color: #801414;
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-secondary {
-  @apply bg-white border border-surface-border text-ink-800 px-4 py-2 rounded font-medium hover:bg-surface transition-colors disabled:opacity-50;
+  background-color: #FFFFFF;
+  border: 1px solid #E3E6EC;
+  color: #1A1D20;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.btn-secondary:hover {
+  background-color: #F8F9FA;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
 }
 
 .input {
-  @apply w-full border border-surface-border rounded px-3 py-2 bg-white text-ink-900 placeholder:text-muted focus:border-teal outline-none;
+  width: 100%;
+  border: 1px solid #E3E6EC;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  background-color: #FFFFFF;
+  color: #111315;
+  outline: none;
+}
+
+.input::placeholder {
+  color: #706F6F;
+}
+
+.input:focus {
+  border-color: #9E1B1B;
 }
 
 .label {
-  @apply text-sm font-medium text-ink-700 mb-1 block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #26292D;
+  margin-bottom: 0.25rem;
+  display: block;
 }
