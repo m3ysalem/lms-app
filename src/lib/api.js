@@ -216,62 +216,38 @@ export async function startQuizAttempt(employeeId, quizId) {
 
 export async function getQuizQuestions(quizId) {
   try {
-    const { data, error } = await supabase.rpc('get_quiz_for_attempt', { p_quiz_id: quizId })
-    
-    let rows = []
-    if (!error && Array.isArray(data) && data.length > 0) {
-      rows = data
-    } else {
-      const { data: qData, error: qError } = await supabase
-        .from('quiz_questions')
-        .select('*')
-        .eq('quiz_id', quizId)
+    // جلب الأسئلة مباشرة من الجدول لضمان دعم جميع الأنواع (نصي واختيارات) وعدم ضياع القديم
+    const { data: qData, error: qError } = await supabase
+      .from('quiz_questions')
+      .select('*')
+      .eq('quiz_id', quizId)
 
-      if (!qError && qData && qData.length > 0) {
-        const questionIds = qData.map(q => q.id)
-        const { data: aData } = await supabase
-          .from('quiz_answers')
-          .select('*')
-          .in('question_id', questionIds)
+    if (qError || !qData) return []
 
-        const answersList = aData || []
-        
-        return qData.map(q => ({
-          id: q.id,
-          text: q.text || q.question_text,
-          type: q.type || q.question_type || 'single_choice',
-          points: q.points || 1,
-          answers: answersList
-            .filter(a => a.question_id === q.id)
-            .map(a => ({ id: a.id, text: a.answer_text || a.text }))
+    const questionIds = qData.map(q => q.id)
+    const { data: aData } = await supabase
+      .from('quiz_answers')
+      .select('*')
+      .in('question_id', questionIds)
+
+    const answersList = aData || []
+
+    return qData.map(q => ({
+      id: q.id,
+      text: q.text || q.question_text,
+      type: q.type || q.question_type || 'multiple_choice',
+      points: q.points || 1,
+      correct_answer_text: q.correct_answer_text || '',
+      answers: answersList
+        .filter(a => a.question_id === q.id)
+        .map(a => ({ 
+          id: a.id, 
+          text: a.answer_text || a.text,
+          is_correct: a.is_correct 
         }))
-      }
-    }
-
-    const map = new Map()
-    for (const row of rows) {
-      const qId = row.question_id || row.id
-      const qText = row.question_text || row.text
-      const qType = row.question_type || row.type
-      const aId = row.answer_id || row.answerId
-      const aText = row.answer_text || row.answerText
-
-      if (qId && !map.has(qId)) {
-        map.set(qId, {
-          id: qId,
-          text: qText,
-          type: qType,
-          points: row.points || 1,
-          answers: [],
-        })
-      }
-      if (qId && aId) {
-        map.get(qId).answers.push({ id: aId, text: aText })
-      }
-    }
-    return Array.from(map.values())
+    }))
   } catch (err) {
-    console.error('getQuizQuestions exception:', err)
+    console.error('getQuizQuestions error:', err)
     return []
   }
 }
