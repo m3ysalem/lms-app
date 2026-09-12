@@ -14,7 +14,9 @@ export default function CourseBuilder() {
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(() => {
-    getCourseWithStructure(courseId).then(setData)
+    getCourseWithStructure(courseId).then(setData).catch((err) => {
+      console.error('Error loading course structure:', err)
+    })
   }, [courseId])
 
   useEffect(() => { load() }, [load])
@@ -23,19 +25,31 @@ export default function CourseBuilder() {
   const { course, modules, quiz } = data
 
   const togglePublish = async () => {
-    await updateCourse(course.id, {
-      status: course.status === 'published' ? 'draft' : 'published',
-      publish_date: course.status === 'published' ? course.publish_date : new Date().toISOString().slice(0, 10),
-    })
-    load()
+    try {
+      await updateCourse(course.id, {
+        status: course.status === 'published' ? 'draft' : 'published',
+        publish_date: course.status === 'published' ? course.publish_date : new Date().toISOString().slice(0, 10),
+      })
+      load()
+    } catch (err) {
+      alert('Error updating status: ' + err.message)
+    }
   }
 
   const createModule = async (e) => {
     e.preventDefault()
     if (!newModuleTitle.trim()) return
-    await addModule(courseId, newModuleTitle.trim(), modules.length + 1)
-    setNewModuleTitle('')
-    load()
+    try {
+      setBusy(true)
+      await addModule(courseId, newModuleTitle.trim(), modules.length + 1)
+      setNewModuleTitle('')
+      load()
+    } catch (err) {
+      console.error('Error creating module:', err)
+      alert('Failed to add module: ' + (err.message || JSON.stringify(err)))
+    } finally {
+      setBusy(false)
+    }
   }
 
   const updateLessonForm = (moduleId, patch) => {
@@ -45,38 +59,52 @@ export default function CourseBuilder() {
   const createLesson = async (moduleId, sortOrder) => {
     const form = lessonForms[moduleId]
     if (!form?.title?.trim()) return
-    setBusy(true)
-    await addLesson(moduleId, {
-      title: form.title.trim(),
-      content_type: form.content_type,
-      body: form.body,
-      video_url: form.video_url,
-      duration_minutes: Number(form.duration_minutes) || 0,
-      sort_order: sortOrder,
-    })
-    setLessonForms((prev) => ({ ...prev, [moduleId]: undefined }))
-    setBusy(false)
-    load()
+    try {
+      setBusy(true)
+      await addLesson(moduleId, {
+        title: form.title.trim(),
+        content_type: form.content_type,
+        body: form.body,
+        video_url: form.video_url,
+        duration_minutes: Number(form.duration_minutes) || 0,
+        sort_order: sortOrder,
+      })
+      setLessonForms((prev) => ({ ...prev, [moduleId]: undefined }))
+      load()
+    } catch (err) {
+      alert('Failed to add lesson: ' + err.message)
+    } finally {
+      setBusy(false)
+    }
   }
 
   const createQuiz = async () => {
-    await addQuiz(courseId, { title: `${course.name} — Final Quiz`, passing_score: course.passing_score, max_attempts: 3 })
-    load()
+    try {
+      await addQuiz(courseId, { title: `${course.name} — Final Quiz`, passing_score: course.passing_score, max_attempts: 3 })
+      load()
+    } catch (err) {
+      alert('Failed to create quiz: ' + err.message)
+    }
   }
 
   const createQuestion = async () => {
     if (!questionForm.text.trim() || questionForm.answers.some((a) => !a.text.trim())) return
-    setBusy(true)
-    const q = await addQuestion(quiz.id, {
-      question_text: questionForm.text,
-      question_type: questionForm.type,
-      points: Number(questionForm.points) || 1,
-      sort_order: 0,
-    })
-    await addAnswers(q.id, questionForm.answers)
-    setQuestionForm({ text: '', type: 'multiple_choice', points: 1, answers: [{ text: '', correct: true }, { text: '', correct: false }] })
-    setBusy(false)
-    load()
+    try {
+      setBusy(true)
+      const q = await addQuestion(quiz.id, {
+        question_text: questionForm.text,
+        question_type: questionForm.type,
+        points: Number(questionForm.points) || 1,
+        sort_order: 0,
+      })
+      await addAnswers(q.id, questionForm.answers)
+      setQuestionForm({ text: '', type: 'multiple_choice', points: 1, answers: [{ text: '', correct: true }, { text: '', correct: false }] })
+      load()
+    } catch (err) {
+      alert('Failed to add question: ' + err.message)
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -126,7 +154,7 @@ export default function CourseBuilder() {
                 ) : lessonForms[m.id]?.content_type === 'text' ? (
                   <textarea className="input" rows={3} placeholder="Lesson text content" value={lessonForms[m.id]?.body || ''} onChange={(e) => updateLessonForm(m.id, { body: e.target.value })} />
                 ) : (
-                  <p className="text-xs text-muted">File upload for this content type goes through Supabase Storage — see README "Storage buckets".</p>
+                  <p className="text-xs text-muted">File upload goes through Supabase Storage.</p>
                 )}
                 <button type="button" className="btn-secondary" disabled={busy} onClick={() => createLesson(m.id, m.lessons.length + 1)}>
                   Add lesson
@@ -138,7 +166,7 @@ export default function CourseBuilder() {
 
         <form onSubmit={createModule} className="flex gap-2">
           <input className="input" placeholder="New module title" value={newModuleTitle} onChange={(e) => setNewModuleTitle(e.target.value)} />
-          <button className="btn-secondary shrink-0">Add module</button>
+          <button type="submit" className="btn-secondary shrink-0" disabled={busy}>Add module</button>
         </form>
       </section>
 
@@ -196,7 +224,7 @@ export default function CourseBuilder() {
                 + Add answer option
               </button>
               <div>
-                <button className="btn-primary" disabled={busy} onClick={createQuestion}>Add question</button>
+                <button type="button" className="btn-primary" disabled={busy} onClick={createQuestion}>Add question</button>
               </div>
             </div>
           </div>
