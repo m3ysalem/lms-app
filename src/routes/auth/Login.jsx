@@ -56,7 +56,11 @@ export default function Login() {
         
         {/* Brand Header & Title centered */}
         <div className="text-center flex flex-col items-center mb-8">
-          <div className="bg-white px-5 py-3 rounded-2xl shadow-xl shadow-black/40 border border-white mb-4 flex items-center justify-center">
+          {/* تم إجبار اللون الأبيض الصريح هنا بالـ Inline Style لضمان عدم تأثره بالـ CSS العام */}
+          <div 
+            className="px-6 py-3.5 rounded-2xl shadow-2xl border border-white mb-4 flex items-center justify-center"
+            style={{ backgroundColor: '#ffffff', opacity: 1 }}
+          >
             <img 
               src="/logo.png" 
               alt="ALESRAA PHARMACEUTICALS" 
