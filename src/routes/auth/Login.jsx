@@ -44,23 +44,23 @@ export default function Login() {
   return (
     <div className="min-h-screen relative flex items-center justify-center bg-[#0d0f12] overflow-hidden bg-cover bg-center" style={{ backgroundImage: `url('/company-bg.jpg')` }}>
       
-      {/* Modern Deep Overlay with Blur */}
-      <div className="absolute inset-0 bg-[#0d0f12]/80 backdrop-blur-md" />
+      {/* Reduced overlay darkness to make company background image more visible */}
+      <div className="absolute inset-0 bg-[#0d0f12]/60 backdrop-blur-[2px]" />
 
       {/* Decorative Glow Elements */}
-      <div className="absolute -top-32 -left-32 w-96 h-96 bg-[#9E1B1B]/20 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-rose-950/30 rounded-full blur-[140px] pointer-events-none" />
+      <div className="absolute -top-32 -left-32 w-96 h-96 bg-[#9E1B1B]/25 rounded-full blur-[140px] pointer-events-none" />
+      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-rose-950/35 rounded-full blur-[140px] pointer-events-none" />
 
       {/* Center Floating Glass Card */}
-      <div className="relative z-10 w-full max-w-lg mx-4 p-8 sm:p-12 rounded-[2.5rem] bg-[#14181d]/90 border border-white/10 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl text-white">
+      <div className="relative z-10 w-full max-w-lg mx-4 p-8 sm:p-12 rounded-[2.5rem] bg-[#14181d]/85 border border-white/10 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl text-white">
         
-        {/* Brand Header & Title centered */}
+        {/* Brand Header & Title centered - Slightly larger logo */}
         <div className="text-center flex flex-col items-center mb-8">
-          <div className="bg-white/95 p-3 rounded-2xl shadow-xl shadow-black/40 backdrop-blur-md border border-white/25 mb-4">
+          <div className="bg-white/95 p-3.5 rounded-2xl shadow-xl shadow-black/40 backdrop-blur-md border border-white/25 mb-4">
             <img 
               src="/logo.png" 
               alt="ALESRAA PHARMACEUTICALS" 
-              className="h-10 w-auto object-contain"
+              className="h-12 w-auto object-contain"
               onError={(e) => { e.target.style.display = 'none' }}
             />
           </div>
