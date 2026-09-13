@@ -155,7 +155,7 @@ export default function Quiz() {
   }
 
   const handleSubmit = () => {
-    const un answered = questions.filter(q => {
+    const unanswered = questions.filter(q => {
       const ans = answers[q.id]
       if (!ans) return true
       if (Array.isArray(ans) && ans.length === 0) return true
