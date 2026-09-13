@@ -80,7 +80,7 @@ export default function CoursePlayer() {
     <div className="space-y-6">
       <div>
         <Link to="/courses" className="text-sm text-teal hover:underline">← Back to catalog</Link>
-        <h1 className="text-2xl font-bold mt-2">{course?.name}</h1>
+        <h1 className="text-2xl font-bold mt-2 text-white">{course?.name}</h1>
         <div className="flex items-center gap-3 mt-2">
           <div className="w-48"><ProgressBar percent={percent} /></div>
           <span className="text-sm text-muted">{percent}% complete</span>
@@ -113,12 +113,12 @@ export default function CoursePlayer() {
             </div>
           ))}
           
-          {/* زر الاختبار مع عنصر span داخلي لإجبار اللون الأسود */}
+          {/* زر الاختبار بتصميم متناسق مع الدارك مود */}
           <Link
             to={`/courses/${courseId}/quiz`}
-            style={{ backgroundColor: '#ccfbf1', display: 'block', marginTop: '16px', padding: '10px 12px', borderRadius: '8px', textAlign: 'center', textDecoration: 'none' }}
+            style={{ backgroundColor: '#0d9488', display: 'block', marginTop: '16px', padding: '10px 12px', borderRadius: '8px', textAlign: 'center', textDecoration: 'none' }}
           >
-            <span style={{ color: '#000000', fontWeight: 'bold', fontSize: '14px' }}>📝 Take Course Quiz →</span>
+            <span style={{ color: '#ffffff', fontWeight: 'bold', fontSize: '14px' }}>📝 Take Course Quiz →</span>
           </Link>
         </aside>
 
@@ -128,10 +128,10 @@ export default function CoursePlayer() {
             <p className="text-muted">This course has no lessons yet.</p>
           ) : (
             <>
-              <h2 className="font-head text-xl font-semibold mb-4">{activeLesson.title}</h2>
+              <h2 className="font-head text-xl font-semibold mb-4 text-white">{activeLesson.title}</h2>
 
               {activeLesson.content_type === 'text' && (
-                <p className="text-ink-700 leading-relaxed whitespace-pre-line">{activeLesson.body}</p>
+                <p className="text-ink-300 leading-relaxed whitespace-pre-line">{activeLesson.body}</p>
               )}
               {(activeLesson.content_type === 'video' || activeLesson.content_type === 'external_video') && activeLesson.video_url && (
                 <div className="aspect-video bg-ink-900 rounded overflow-hidden mb-4">
@@ -156,16 +156,16 @@ export default function CoursePlayer() {
               )}
 
               <div className="flex items-center justify-between mt-8 pt-4 border-t border-surface-border">
-                {/* زر السابق مع span داخلي لإجبار اللون الأسود */}
+                {/* زر السابق بتصميم مريح للعين في الدارك مود */}
                 <button
-                  style={{ backgroundColor: '#e5e7eb', padding: '8px 16px', borderRadius: '6px', border: 'none', cursor: 'pointer' }}
+                  style={{ backgroundColor: '#374151', padding: '8px 16px', borderRadius: '6px', border: 'none', cursor: 'pointer' }}
                   disabled={allLessons.findIndex((l) => l.id === activeLesson.id) === 0}
                   onClick={() => {
                     const idx = allLessons.findIndex((l) => l.id === activeLesson.id)
                     if (idx > 0) setActiveLessonId(allLessons[idx - 1].id)
                   }}
                 >
-                  <span style={{ color: '#000000', fontWeight: 'bold' }}>← Previous</span>
+                  <span style={{ color: '#ffffff', fontWeight: 'bold' }}>← Previous</span>
                 </button>
                 <button className="btn-primary" onClick={completeAndAdvance}>
                   {lessonProgress[activeLesson.id]?.status === 'completed' ? 'Next lesson →' : 'Mark complete & continue'}
