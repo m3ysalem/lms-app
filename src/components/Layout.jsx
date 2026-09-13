@@ -39,13 +39,12 @@ export default function Layout({ children }) {
   return (
     <div className="min-h-screen flex relative bg-[#0d0f12] overflow-x-hidden bg-cover bg-center bg-fixed" style={{ backgroundImage: `url('/company-bg.jpg')` }}>
       
-      {/* Modern Deep Overlay with Blur matching login vibe */}
-      <div className="absolute inset-0 bg-[#0d0f12]/85 backdrop-blur-md pointer-events-none fixed" />
+      {/* Dark Overlay with proper contrast */}
+      <div className="absolute inset-0 bg-[#0d0f12]/90 backdrop-blur-md pointer-events-none fixed" />
 
-      {/* Desktop sidebar - Glassmorphism style */}
-      <aside className="hidden md:flex flex-col w-64 bg-[#14181d]/90 text-white shrink-0 shadow-2xl border-r border-white/10 relative z-20 backdrop-blur-xl">
-        {/* Logo Section */}
-        <div className="px-6 py-6 border-b border-white/10 flex items-center gap-3.5 bg-[#0d0f12]/50">
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex flex-col w-64 bg-[#14181d]/95 text-white shrink-0 shadow-2xl border-r border-white/10 relative z-20 backdrop-blur-xl">
+        <div className="px-6 py-6 border-b border-white/10 flex items-center gap-3.5 bg-[#0d0f12]/60">
           <div className="bg-white/95 p-2 rounded-xl shrink-0 shadow-lg border border-white/20">
             <img 
               src="/logo.png" 
@@ -60,7 +59,6 @@ export default function Layout({ children }) {
           </div>
         </div>
 
-        {/* Navigation Tabs */}
         <nav className="flex-1 py-6 px-3 space-y-1.5 overflow-y-auto">
           {nav.map((item) => (
             <NavLink
@@ -80,7 +78,6 @@ export default function Layout({ children }) {
           ))}
         </nav>
 
-        {/* User Profile & Logout Box */}
         <div className="p-4 m-3 rounded-2xl bg-white/[0.03] border border-white/10 shadow-inner backdrop-blur-md">
           <p className="text-sm font-bold truncate text-white">{profile?.full_name}</p>
           <p className="text-xs text-gray-400 truncate mb-3">{profile?.employee_code || profile?.email}</p>
@@ -93,7 +90,7 @@ export default function Layout({ children }) {
         </div>
       </aside>
 
-      {/* Mobile top bar + drawer */}
+      {/* Mobile top bar */}
       <div className="md:hidden fixed top-0 inset-x-0 z-30 bg-[#14181d]/95 backdrop-blur-md text-white flex items-center justify-between px-4 py-3 border-b border-white/10 shadow-md">
         <div className="flex items-center gap-2.5">
           <div className="bg-white/95 p-1.5 rounded-lg shrink-0 border border-white/20">
