@@ -29,76 +29,74 @@ export default function Quiz() {
         return
       }
 
-      // 1. جلب بيانات الكورس
+      // 1. جلب بيانات الكورس الأساسية
       const { data: cData } = await supabase.from('courses').select('*').eq('id', courseId).maybeSingle()
       setCourse(cData)
 
-      // 2. البحث عن اختبار أو إنشاء اختبار افتراضي
+      // 2. البحث عن الاختبار المرتبط بالكورس في جدول quizzes
       let activeQuiz = null
       const { data: qData } = await supabase.from('quizzes').select('*').eq('course_id', courseId).maybeSingle()
       
       if (qData) {
         activeQuiz = qData
       } else {
+        // لو مفيش اختبار مسجل، ننشئ كائن اختبار افتراضي بالاعتماد على بيانات الكورس
         activeQuiz = { 
-          id: 'fallback-quiz-' + courseId, 
+          id: 'quiz-' + courseId, 
           title: cData?.name ? `الاختبار النهائي — ${cData.name}` : 'الاختبار النهائي', 
           passing_score: cData?.passing_score || 80 
         }
       }
       setQuiz(activeQuiz)
 
-      // 3. جلب الأسئلة من قاعدة البيانات
+      // 3. جلب الأسئلة الحقيقية من قاعدة البيانات بالطرق المختلفة لضمان عدم تفويت أي سؤال حطّه الآدمن
       let rawQuestions = []
-      if (activeQuiz && activeQuiz.id && !activeQuiz.id.startsWith('fallback-')) {
+
+      // المحاولة الأولى: البحث بربط الأسئلة بالـ quiz_id
+      if (activeQuiz && activeQuiz.id && !activeQuiz.id.startsWith('quiz-')) {
         const { data: qList } = await supabase.from('quiz_questions').select('*').eq('quiz_id', activeQuiz.id)
-        rawQuestions = qList || []
+        if (qList && qList.length > 0) rawQuestions = qList
       }
 
+      // المحاولة الثانية: البحث بالـ course_id لو الجدول يحتوي عليه
+      if (rawQuestions.length === 0) {
+        const { data: qByCourse } = await supabase.from('quiz_questions').select('*').eq('course_id', courseId)
+        if (qByCourse && qByCourse.length > 0) rawQuestions = qByCourse
+      }
+
+      // المحاولة الثالثة الشاملة: جلب كل الأسئلة الموجودة في جدول quiz_questions (في حال كان الآدمن أضافها ولم يربطها بالمعرفات)
       if (rawQuestions.length === 0) {
         const { data: allQ } = await supabase.from('quiz_questions').select('*')
-        rawQuestions = allQ || []
+        if (allQ && allQ.length > 0) rawQuestions = allQ
       }
 
       let loadedQuestions = []
       for (const q of rawQuestions) {
-        const { data: answersData } = await supabase
+        // جلب الإجابات الخاصة بكل سؤال من جدول quiz_answers أو من أعمدة السؤال نفسه
+        let answersData = []
+        const { data: ansList } = await supabase
           .from('quiz_answers')
           .select('*')
           .eq('question_id', q.id)
+        
+        if (ansList && ansList.length > 0) {
+          answersData = ansList
+        } else if (q.options && Array.isArray(q.options)) {
+          // لو الإجابات مخزنة كـ JSON داخل حقل options في نفس جدول الأسئلة
+          answersData = q.options.map((opt, optIdx) => ({
+            id: opt.id || optIdx,
+            text: opt.text || opt.answer_text || opt,
+            correct: opt.correct || opt.is_correct || false
+          }))
+        }
 
         loadedQuestions.push({
           id: q.id,
-          text: q.question_text || q.text || 'سؤال',
+          text: q.question_text || q.text || q.title || 'سؤال',
           type: q.question_type || q.type || 'multiple_choice',
           correct_answer_text: q.correct_answer_text,
-          answers: answersData || []
+          answers: answersData
         })
-      }
-
-      // 4. الحل الأخير الذكي: لو قاعدة البيانات فارغة تماماً من الأسئلة، نضع أسئلة افتراضية تجريبية لكي يعمل الاختبار فوراً
-      if (loadedQuestions.length === 0) {
-        loadedQuestions = [
-          {
-            id: 'mock-q-1',
-            text: 'ما هي الغاية الأساسية من اتباع معايير السلامة والصحة المهنية (HSE)؟',
-            type: 'multiple_choice',
-            answers: [
-              { id: 'a1', text: 'حماية العاملين وبيئة العمل من المخاطر الحوادث', correct: true },
-              { id: 'a2', text: 'زيادة ساعات العمل الإضافية فقط', correct: false },
-              { id: 'a3', text: 'تخفيض رواتب الموظفين', correct: false }
-            ]
-          },
-          {
-            id: 'mock-q-2',
-            text: 'هل يُعتبر الإبلاغ الفوري عن إصابات العمل وإصدار التقارير إجراءً إلزامياً؟',
-            type: 'multiple_choice',
-            answers: [
-              { id: 'b1', text: 'نعم، هو إجراء إلزامي وقانوني', correct: true },
-              { id: 'b2', text: 'لا، حسب رغبة الموظف', correct: false }
-            ]
-          }
-        ]
       }
 
       setQuestions(loadedQuestions)
@@ -159,16 +157,20 @@ export default function Quiz() {
       questions.forEach(q => {
         const userAns = answers[q.id]
         if (q.type === 'text' || q.type === 'essay') {
-          if (userAns) correct++
+          if (userAns && q.correct_answer_text && userAns.trim().toLowerCase() === q.correct_answer_text.trim().toLowerCase()) {
+            correct++
+          } else if (userAns && !q.correct_answer_text) {
+            correct++
+          }
         } else {
-          const correctAnswersIds = (q.answers || []).filter(a => a.correct === true || a.correct === 1 || a.is_correct === true).map(a => a.id)
+          const correctAnswersIds = (q.answers || []).filter(a => a.correct === true || a.correct === 1 || a.is_correct === true || a.isCorrect === true).map(a => a.id)
           const userSelected = Array.isArray(userAns) ? userAns : []
 
           if (correctAnswersIds.length > 0 && userSelected.length > 0) {
             const isMatch = correctAnswersIds.length === userSelected.length && correctAnswersIds.every(id => userSelected.includes(id))
             if (isMatch) correct++
-          } else if (userSelected.length > 0) {
-            correct++ // اعتبار الإجابة صحيحة افتراضياً في حالة الأسئلة التجريبية
+          } else if (userSelected.length > 0 && correctAnswersIds.length === 0) {
+            correct++ // لو مفيش إجابة صحيحة محددة في قاعدة البيانات، نعتبر اختيار المستخدم صحيحاً
           }
         }
       })
@@ -211,7 +213,14 @@ export default function Quiz() {
           <p className="text-gray-300 mb-2">درجة النجاح المطلوبة: <strong>{quiz?.passing_score || course?.passing_score || 80}%</strong></p>
           <p className="text-yellow-400 text-sm mb-4">⚠️ تنبيه: لا يمكن تسليم الاختبار إلا بعد الإجابة على كافة الأسئلة.</p>
           
-          <button className="px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded font-bold cursor-pointer" onClick={begin}>Start quiz</button>
+          {questions.length === 0 ? (
+            <div className="space-y-3">
+              <p className="text-red-400 font-bold">لا توجد أسئلة مضافة في لوحة الآدمن لهذا الكورس حتى الآن.</p>
+              <p className="text-xs text-gray-400">يرجى الذهاب لوحة التحكم (Course Builder) وإضافة الأسئلة وخيارات الإجابة.</p>
+            </div>
+          ) : (
+            <button className="px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded font-bold cursor-pointer" onClick={begin}>Start quiz</button>
+          )}
         </div>
       ) : attemptId && !result ? (
         <div className="space-y-5">
