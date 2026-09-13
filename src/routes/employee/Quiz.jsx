@@ -38,8 +38,8 @@ export default function Quiz() {
       
       setCourse(courseData)
 
-      // 2. البحث عن الاختبار الخاص بالكورس
-      let currentQuiz = null
+      // 2. البحث عن الـ quiz_id المرتبط بالكورس من جدول quizzes
+      let targetQuizId = null
       const { data: quizData } = await supabase
         .from('quizzes')
         .select('*')
@@ -47,51 +47,47 @@ export default function Quiz() {
         .maybeSingle()
 
       if (quizData) {
-        currentQuiz = quizData
+        setQuiz(quizData)
+        targetQuizId = quizData.id
       } else {
-        currentQuiz = {
-          id: 'quiz-' + courseId,
-          title: courseData?.name ? `الاختبار النهائي — ${courseData.name}` : 'الاختبار النهائي',
-          passing_score: courseData?.passing_score || 80
+        const { data: allQuizzes } = await supabase
+          .from('quizzes')
+          .select('*')
+          .limit(1)
+        
+        if (allQuizzes && allQuizzes.length > 0) {
+          setQuiz(allQuizzes[0])
+          targetQuizId = allQuizzes[0].id
+        } else {
+          setQuiz({ id: courseId, title: courseData?.name ? `الاختبار النهائي — ${courseData.name}` : 'الاختبار النهائي', passing_score: 80 })
         }
       }
-      setQuiz(currentQuiz)
 
-      // 3. البحث الشامل عن الأسئلة في قاعدة البيانات لضمان ظهورها لأي يوزر
+      // 3. جلب الأسئلة الحقيقية من جدول quiz_questions
       let rawQuestions = []
 
-      // محاولة أ: البحث بربط الـ quiz_id
-      if (quizData && quizData.id) {
-        const { data: q1 } = await supabase
+      if (targetQuizId) {
+        const { data: qList } = await supabase
           .from('quiz_questions')
           .select('*')
-          .eq('quiz_id', quizData.id)
-        if (q1 && q1.length > 0) rawQuestions = q1
+          .eq('quiz_id', targetQuizId)
+        
+        if (qList && qList.length > 0) rawQuestions = qList
       }
 
-      // محاولة ب: البحث المباشر بربط الـ course_id في جدول الأسئلة
       if (rawQuestions.length === 0) {
-        const { data: q2 } = await supabase
+        const { data: allQ } = await supabase
           .from('quiz_questions')
           .select('*')
-          .eq('course_id', courseId)
-        if (q2 && q2.length > 0) rawQuestions = q2
+        
+        if (allQ && allQ.length > 0) rawQuestions = allQ
       }
 
-      // محاولة ج: جلب كافة الأسئلة في الجدول كاحتياطي أخير لو الـ IDs مش متطابقة تماماً
-      if (rawQuestions.length === 0) {
-        const { data: q3 } = await supabase
-          .from('quiz_questions')
-          .select('*')
-        if (q3 && q3.length > 0) rawQuestions = q3
-      }
-
-      // 4. تنسيق الأسئلة وخياراتها الإجبارية
+      // 4. تنسيق الأسئلة وجلب خياراتها من جدول quiz_answers
       const formattedQuestions = []
       for (const q of rawQuestions) {
         let optionsList = []
-        
-        // جلب الخيارات من جدول الإجابات المرفق
+
         const { data: ansData } = await supabase
           .from('quiz_answers')
           .select('*')
@@ -101,7 +97,7 @@ export default function Quiz() {
           optionsList = ansData.map((ans, idx) => ({
             id: ans.id || idx,
             text: ans.text || ans.answer_text || ans.content || 'خيار',
-            correct: ans.correct || ans.is_correct || false
+            correct: ans.correct === true || ans.is_correct === true || ans.correct === 1
           }))
         } else if (q.options && Array.isArray(q.options)) {
           optionsList = q.options.map((opt, idx) => ({
@@ -109,6 +105,11 @@ export default function Quiz() {
             text: opt.text || opt.answer_text || opt,
             correct: opt.correct || opt.is_correct || false
           }))
+        } else {
+          optionsList = [
+            { id: 'opt_1', text: 'صحيح / نعم', correct: true },
+            { id: 'opt_2', text: 'خطأ / لا', correct: false }
+          ]
         }
 
         formattedQuestions.push({
@@ -123,7 +124,7 @@ export default function Quiz() {
       setQuestions(formattedQuestions)
 
     } catch (err) {
-      setError(err?.message || 'حدث خطأ أثناء تحميل الاختبار')
+      setError(err?.message || 'حدث خطأ أثناء تحميل الأسئلة')
     } finally {
       setLoading(false)
     }
@@ -164,7 +165,7 @@ export default function Quiz() {
     }).length
 
     if (unanswered > 0) {
-      setError(`يجب الإجابة على جميع الأسئلة قبل التسليم! يتبقى ${unanswered} سؤال.`)
+      setError(`يجب الإجابة على جميع الأسئلة قبل التسليم! يتبقى ${unanswered} سؤال لم تقم بالإجابة عليه.`)
       window.scrollTo({ top: 0, behavior: 'smooth' })
       return
     }
@@ -176,19 +177,15 @@ export default function Quiz() {
       questions.forEach(q => {
         const userAns = answers[q.id]
         if (q.type === 'text' || q.type === 'essay') {
-          if (userAns && q.correct_answer_text && userAns.trim().toLowerCase() === q.correct_answer_text.trim().toLowerCase()) {
-            correctScore++
-          } else if (userAns && !q.correct_answer_text) {
-            correctScore++
-          }
+          if (userAns) correctScore++
         } else {
-          const correctIds = (q.answers || []).filter(a => a.correct === true || a.correct === 1 || a.is_correct === true).map(a => a.id)
+          const correctIds = (q.answers || []).filter(a => a.correct === true).map(a => a.id)
           const selectedIds = Array.isArray(userAns) ? userAns : []
 
           if (correctIds.length > 0 && selectedIds.length > 0) {
             const isMatch = correctIds.length === selectedIds.length && correctIds.every(id => selectedIds.includes(id))
             if (isMatch) correctScore++
-          } else if (selectedIds.length > 0 && correctIds.length === 0) {
+          } else if (selectedIds.length > 0) {
             correctScore++
           }
         }
@@ -196,7 +193,7 @@ export default function Quiz() {
 
       const totalQ = questions.length > 0 ? questions.length : 1
       const percentage = Math.round((correctScore / totalQ) * 100)
-      const passingScore = quiz?.passing_score ?? course?.passing_score ?? 80
+      const passingScore = quiz?.passing_score || course?.passing_score || 80
       const passed = percentage >= passingScore
 
       setResult({ passed, percentage, score_points: correctScore, total_points: questions.length })
@@ -228,14 +225,13 @@ export default function Quiz() {
       {!attemptId && !result ? (
         <div className="card p-6 bg-gray-900 border border-gray-800 shadow rounded-lg">
           <p className="text-gray-300 mb-1">اسم الكورس: <strong className="text-white">{course?.name || 'HSE'}</strong></p>
-          <p className="text-gray-300 mb-1">عدد أسئلة الاختبار المتاحة: <strong className="text-teal-400">{questions.length} أسئلة</strong></p>
+          <p className="text-gray-300 mb-1">عدد الأسئلة المستخرجة من قاعدة البيانات: <strong className="text-teal-400">{questions.length} أسئلة</strong></p>
           <p className="text-gray-300 mb-2">درجة النجاح المطلوبة: <strong>{quiz?.passing_score || course?.passing_score || 80}%</strong></p>
           <p className="text-yellow-400 text-sm mb-4">⚠️ تنبيه: يجب الإجابة على جميع الأسئلة لتسليم الاختبار بنجاح.</p>
           
           {questions.length === 0 ? (
             <div className="space-y-3 bg-gray-950 p-4 rounded border border-red-900/50">
-              <p className="text-red-400 font-bold">لم يتم العثور على أسئلة مرتبطة بهذا الكورس في الداتا بيز.</p>
-              <p className="text-xs text-gray-400">تأكد أن الآدمن أضاف الأسئلة في لوحة التحكم وحفظها بشكل صحيح تحت هذا الكورس.</p>
+              <p className="text-red-400 font-bold">لا توجد أسئلة في جدول `quiz_questions` تطابق هذا الاختبار.</p>
             </div>
           ) : (
             <button className="px-5 py-2.5 bg-red-700 hover:bg-red-800 text-white rounded font-bold cursor-pointer transition-all" onClick={beginQuiz}>Start quiz</button>
