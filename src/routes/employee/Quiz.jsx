@@ -33,33 +33,35 @@ export default function Quiz() {
       const { data: cData } = await supabase.from('courses').select('*').eq('id', courseId).maybeSingle()
       setCourse(cData)
 
-      // 2. البحث عن اختبار مرتبط بهذا الكورس
+      // 2. البحث عن اختبار مرتبط بالكورس، أو جلبه بأي طريقة لضمان عدم توقف المتدرب
       let activeQuiz = null
       const { data: qData } = await supabase.from('quizzes').select('*').eq('course_id', courseId).maybeSingle()
       
       if (qData) {
         activeQuiz = qData
       } else {
-        // لو مش ملقيش اختبار مرتبط بالـ course_id مباشرة، نجيب أي اختبار متاح في الجدول كخيار احتياطي لعدم إيقاف المستخدم
+        // لو مفيش اختبار مربوط صراحة بالـ courseId، نشوف لو فيه أي اختبار عام أو ننشئ واحد طائر للكورس
         const { data: allQuizzes } = await supabase.from('quizzes').select('*').limit(1)
         if (allQuizzes && allQuizzes.length > 0) {
           activeQuiz = allQuizzes[0]
         } else {
-          // لو الجدول فارغ تماماً، نقوم بإنشاء اختبار افتراضي محلياً عشان الصفحة تشتغل وما تقفش
-          activeQuiz = { id: 'fallback-quiz-' + courseId, title: cData?.name ? `${cData.name} — الاختبار النهائي` : 'اختبار الكورس', passing_score: cData?.passing_score || 50 }
+          activeQuiz = { 
+            id: 'fallback-quiz-' + courseId, 
+            title: cData?.name ? `الاختبار النهائي — ${cData.name}` : 'الاختبار النهائي', 
+            passing_score: cData?.passing_score || 80 
+          }
         }
       }
       setQuiz(activeQuiz)
 
-      // 3. جلب الأسئلة: نحاول جلبها بربطها بـ quiz_id أو جلب كل الأسئلة المتاحة في قاعدة البيانات للتأكد من ظهورها للمستخدم
+      // 3. جلب الأسئلة: جلبها بربطها بـ quiz_id الخاص بالاختبار، أو جلب كل الأسئلة المتاحة كاحتياطي شامل
       let rawQuestions = []
-      
       if (activeQuiz && activeQuiz.id && !activeQuiz.id.startsWith('fallback-')) {
         const { data: qList } = await supabase.from('quiz_questions').select('*').eq('quiz_id', activeQuiz.id)
         rawQuestions = qList || []
       }
 
-      // لو ملقاش أسئلة بالـ quiz_id، نجيب كل الأسئلة من الجدول كحل احتياطي شامل
+      // لو لم يتم العثور على أسئلة مرتبطة بالـ quiz_id، نجلب كل الأسئلة الموجودة في الجدول لضمان ظهورها
       if (rawQuestions.length === 0) {
         const { data: allQ } = await supabase.from('quiz_questions').select('*')
         rawQuestions = allQ || []
@@ -67,7 +69,6 @@ export default function Quiz() {
 
       let loadedQuestions = []
       for (const q of rawQuestions) {
-        // جلب الإجابات لكل سؤال
         const { data: answersData } = await supabase
           .from('quiz_answers')
           .select('*')
@@ -75,7 +76,7 @@ export default function Quiz() {
 
         loadedQuestions.push({
           id: q.id,
-          text: q.question_text || q.text || q.title || 'سؤال',
+          text: q.question_text || q.text || 'سؤال',
           type: q.question_type || q.type || 'multiple_choice',
           correct_answer_text: q.correct_answer_text,
           answers: answersData || []
@@ -128,7 +129,7 @@ export default function Quiz() {
     }).length
 
     if (unansweredCount > 0) {
-      setError(`يجب الإجابة على جميع الأسئلة قبل الإرسال! يتبقى ${unansweredCount} سؤال لم تقم بالإجابة عليه.`)
+      setError(`يجب الإجابة على جميع الأسئلة قبل الإرسال! يتبقى ${unansweredCount} سؤال لم تقم بالاجابة عليه.`)
       window.scrollTo({ top: 0, behavior: 'smooth' })
       return
     }
@@ -143,7 +144,7 @@ export default function Quiz() {
           if (userAns && q.correct_answer_text && userAns.trim().toLowerCase() === q.correct_answer_text.trim().toLowerCase()) {
             correct++
           } else if (userAns && !q.correct_answer_text) {
-            correct++ // لو مفيش نموذج إجابة محدد للمقالي يعتبر صحيح مؤقتاً
+            correct++
           }
         } else {
           const correctAnswersIds = (q.answers || []).filter(a => a.correct === true || a.correct === 1 || a.is_correct === true).map(a => a.id)
@@ -160,7 +161,7 @@ export default function Quiz() {
 
       const totalQ = questions.length > 0 ? questions.length : 1
       const percentage = Math.round((correct / totalQ) * 100)
-      const passingScore = quiz?.passing_score ?? course?.passing_score ?? 50
+      const passingScore = quiz?.passing_score ?? course?.passing_score ?? 80
       const passed = percentage >= passingScore
 
       setResult({ passed, percentage, score_points: correct, total_points: questions.length })
@@ -185,21 +186,21 @@ export default function Quiz() {
     <div className="max-w-2xl mx-auto space-y-6 p-4">
       <Link to={`/courses/${courseId || ''}`} className="text-sm text-teal-400 hover:underline font-bold">← Back to course</Link>
       
-      <h1 className="text-2xl font-bold text-white">{quiz?.title || course?.name || 'اختبار الكورس'}</h1>
+      <h1 className="text-2xl font-bold text-white">{quiz?.title || (course?.name ? `الاختبار النهائي — ${course.name}` : 'الاختبار النهائي')}</h1>
 
       {error && <div className="text-sm text-red-400 bg-red-950 border border-red-800 rounded px-3 py-3 font-semibold">{error}</div>}
 
       {!attemptId && !result ? (
         <div className="card p-6 bg-gray-900 border border-gray-800 shadow rounded-lg text-white">
-          <p className="text-gray-300 mb-1">اسم الكورس: <strong>{course?.name || 'HSE'}</strong></p>
+          <p className="text-gray-300 mb-1">اسم الكورس: <strong className="text-white">{course?.name || 'HSE'}</strong></p>
           <p className="text-gray-300 mb-1">عدد أسئلة الاختبار المتاحة: <strong className="text-teal-400">{questions.length} أسئلة</strong></p>
-          <p className="text-gray-300 mb-2">درجة النجاح المطلوبة: <strong>{quiz?.passing_score || course?.passing_score || 50}%</strong></p>
+          <p className="text-gray-300 mb-2">درجة النجاح المطلوبة: <strong>{quiz?.passing_score || course?.passing_score || 80}%</strong></p>
           <p className="text-yellow-400 text-sm mb-4">⚠️ تنبيه: لا يمكن تسليم الاختبار إلا بعد الإجابة على كافة الأسئلة.</p>
           
           {questions.length === 0 ? (
             <div className="space-y-3">
               <p className="text-red-400 font-bold">لا توجد أسئلة مضافة في قاعدة البيانات لهذا الاختبار حالياً.</p>
-              <p className="text-xs text-gray-400">يرجى الذهاب لوحة التحكم (Course Builder) وإضافة أسئلة واختيار إجابات لها.</p>
+              <p className="text-xs text-gray-400">يرجى الذهاب لوحة التحكم وإنشاء أسئلة وإجابات لها في Course Builder.</p>
             </div>
           ) : (
             <button className="px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded font-bold cursor-pointer" onClick={begin}>Start quiz</button>
