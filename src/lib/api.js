@@ -189,12 +189,16 @@ export async function upsertCourseProgress(employeeId, courseId, percent) {
   if (error) console.warn('upsertCourseProgress warn:', error.message)
 
   const status = percent >= 100 ? 'completed' : percent > 0 ? 'in_progress' : 'assigned'
-  await supabase
-    .from('course_assignments')
-    .update({ status })
-    .eq('course_id', courseId)
-    .eq('employee_id', employeeId)
-    .catch(() => {})
+  
+  try {
+    await supabase
+      .from('course_assignments')
+      .update({ status })
+      .eq('course_id', courseId)
+      .eq('employee_id', employeeId)
+  } catch (err) {
+    console.warn('Assignment status update warning:', err)
+  }
 }
 
 // ---------- Quiz engine ----------
@@ -216,7 +220,6 @@ export async function startQuizAttempt(employeeId, quizId) {
 
 export async function getQuizQuestions(quizId) {
   try {
-    // جلب الأسئلة مباشرة من الجدول لضمان دعم جميع الأنواع (نصي واختيارات) وعدم ضياع القديم
     const { data: qData, error: qError } = await supabase
       .from('quiz_questions')
       .select('*')
