@@ -56,7 +56,7 @@ export default function Login() {
         
         {/* Brand Header & Title centered */}
         <div className="text-center flex flex-col items-center mb-8">
-          <div className="bg-white p-3.5 rounded-2xl shadow-xl shadow-black/40 border border-white/20 mb-4">
+          <div className="bg-white px-5 py-3 rounded-2xl shadow-xl shadow-black/40 border border-white mb-4 flex items-center justify-center">
             <img 
               src="/logo.png" 
               alt="ALESRAA PHARMACEUTICALS" 
