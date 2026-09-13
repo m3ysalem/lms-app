@@ -31,17 +31,21 @@ export default function Login() {
           .eq('employee_id', rawInput)
           .maybeSingle()
 
+        console.log("Database Lookup Result:", { profileData, profileErr });
+
         if (profileErr || !profileData || !profileData.email) {
           setBusy(false)
-          setError('كود الموظف غير مسجل أو غير صحيح.')
+          setError('كود الموظف غير مسجل أو غير صحيح في جدول profiles.')
           return
         }
-        loginIdentifier = profileData.email
+        loginIdentifier = profileData.email.trim()
       }
+
+      console.log("Attempting sign in with email:", loginIdentifier);
 
       const { error: signErr } = await signIn(loginIdentifier, password)
       setBusy(false)
-
+      
       if (signErr) {
         setError(
           signErr.message === 'Invalid login credentials'
