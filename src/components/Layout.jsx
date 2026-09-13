@@ -45,7 +45,10 @@ export default function Layout({ children }) {
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-[#14181d]/95 text-white shrink-0 shadow-2xl border-r border-white/10 relative z-20 backdrop-blur-xl">
         <div className="px-6 py-6 border-b border-white/10 flex items-center gap-3.5 bg-[#0d0f12]/60">
-          <div className="bg-white px-3 py-2 rounded-xl shrink-0 shadow-lg border border-white flex items-center justify-center">
+          <div 
+            className="px-3 py-2 rounded-xl shrink-0 shadow-lg border border-white flex items-center justify-center"
+            style={{ backgroundColor: '#ffffff', opacity: 1 }}
+          >
             <img 
               src="/logo.png" 
               alt="Logo" 
@@ -93,7 +96,10 @@ export default function Layout({ children }) {
       {/* Mobile top bar */}
       <div className="md:hidden fixed top-0 inset-x-0 z-30 bg-[#14181d]/95 backdrop-blur-md text-white flex items-center justify-between px-4 py-3 border-b border-white/10 shadow-md">
         <div className="flex items-center gap-2.5">
-          <div className="bg-white px-2 py-1.5 rounded-lg shrink-0 border border-white flex items-center justify-center">
+          <div 
+            className="px-2 py-1.5 rounded-lg shrink-0 border border-white flex items-center justify-center"
+            style={{ backgroundColor: '#ffffff', opacity: 1 }}
+          >
             <img 
               src="/logo.png" 
               alt="Logo" 
