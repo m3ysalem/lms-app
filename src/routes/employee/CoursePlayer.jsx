@@ -113,10 +113,10 @@ export default function CoursePlayer() {
             </div>
           ))}
           
-          {/* زر الاختبار مع إجبار ألوان النص والخلفية بـ Inline Style */}
+          {/* زر الاختبار مع لون نص أسود صريح */}
           <Link
             to={`/courses/${courseId}/quiz`}
-            style={{ backgroundColor: '#ccfbf1', color: '#0f766e', display: 'block', marginTop: '16px', padding: '10px 12px', borderRadius: '8px', fontWeight: '600', textAlign: 'center', textDecoration: 'none' }}
+            style={{ backgroundColor: '#ccfbf1', color: '#000000', display: 'block', marginTop: '16px', padding: '10px 12px', borderRadius: '8px', fontWeight: 'bold', textAlign: 'center', textDecoration: 'none' }}
           >
             📝 Take Course Quiz →
           </Link>
@@ -156,9 +156,9 @@ export default function CoursePlayer() {
               )}
 
               <div className="flex items-center justify-between mt-8 pt-4 border-t border-surface-border">
-                {/* زر السابق مع إجبار ألوان النص والخلفية لمنع تأثير الـ Theme العام */}
+                {/* زر السابق مع لون نص أسود صريح وزر فعال */}
                 <button
-                  style={{ backgroundColor: '#e5e7eb', color: '#1f2937', padding: '8px 16px', borderRadius: '6px', fontWeight: '600', border: 'none', cursor: 'pointer' }}
+                  style={{ backgroundColor: '#e5e7eb', color: '#000000', padding: '8px 16px', borderRadius: '6px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}
                   disabled={allLessons.findIndex((l) => l.id === activeLesson.id) === 0}
                   onClick={() => {
                     const idx = allLessons.findIndex((l) => l.id === activeLesson.id)
