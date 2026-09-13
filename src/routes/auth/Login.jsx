@@ -43,17 +43,13 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex bg-[#0d0f12] overflow-hidden">
-      {/* Left Banner Section with Company Background Image */}
+      {/* Left Banner Section - Clean & Minimalist */}
       <div className="hidden md:flex w-7/12 relative text-white flex-col justify-between p-12 overflow-hidden border-r border-white/5 bg-cover bg-center" style={{ backgroundImage: `url('/company-bg.jpg')` }}>
         
-        {/* Dark Overlay with Gradient for modern look & readability */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0d0f12] via-[#0d0f12]/80 to-black/65 backdrop-blur-[2px]" />
+        {/* Dark Overlay for depth & visibility */}
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px]" />
 
-        {/* Glow Effects on top of background */}
-        <div className="absolute -top-24 -left-24 w-96 h-96 bg-[#9E1B1B]/30 rounded-full blur-[120px] pointer-events-none z-10" />
-        <div className="absolute bottom-10 right-10 w-80 h-80 bg-red-900/20 rounded-full blur-[100px] pointer-events-none z-10" />
-
-        {/* Brand Header */}
+        {/* Brand Header Only */}
         <div className="relative z-20 flex items-center gap-4">
           <div className="bg-white/95 p-2.5 rounded-2xl shadow-xl shadow-black/40 backdrop-blur-md border border-white/20">
             <img 
@@ -73,32 +69,8 @@ export default function Login() {
           </div>
         </div>
 
-        {/* Center Content */}
-        <div className="relative z-20 max-w-lg my-auto py-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/40 border border-white/10 backdrop-blur-md mb-6">
-            <span className="w-2 h-2 rounded-full bg-[#9E1B1B] animate-pulse" />
-            <span className="text-xs font-semibold tracking-wide text-gray-200">Next-Gen Enterprise Learning</span>
-          </div>
-          
-          <h1 className="font-head text-5xl font-extrabold leading-[1.15] text-white mb-6 drop-shadow-md">
-            Empower Your Team with <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-rose-400 to-white">Smarter Training.</span>
-          </h1>
-          
-          <p className="text-gray-300 text-base leading-relaxed mb-8 drop-shadow">
-            Assign interactive courses, track compliance in real-time, and elevate skills across your organization — seamless & automated.
-          </p>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 rounded-2xl bg-black/40 border border-white/10 backdrop-blur-md">
-              <div className="text-2xl font-bold text-white mb-1">100%</div>
-              <div className="text-xs text-gray-300">Automated Compliance</div>
-            </div>
-            <div className="p-4 rounded-2xl bg-black/40 border border-white/10 backdrop-blur-md">
-              <div className="text-2xl font-bold text-rose-400 mb-1">Real-Time</div>
-              <div className="text-xs text-gray-300">Skill Analytics</div>
-            </div>
-          </div>
-        </div>
+        {/* Empty Center Space to let background image shine */}
+        <div className="relative z-20 my-auto" />
 
         {/* Footer */}
         <div className="relative z-20 flex items-center justify-between text-xs text-gray-400 border-t border-white/10 pt-6">
