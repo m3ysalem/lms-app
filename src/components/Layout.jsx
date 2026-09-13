@@ -37,12 +37,16 @@ export default function Layout({ children }) {
   }
 
   return (
-    <div className="min-h-screen flex bg-[#f4f6f9]">
-      {/* Desktop sidebar */}
-      <aside className="hidden md:flex flex-col w-64 bg-[#14171A] text-white shrink-0 shadow-2xl border-r border-white/10">
+    <div className="min-h-screen flex relative bg-[#0d0f12] overflow-x-hidden bg-cover bg-center bg-fixed" style={{ backgroundImage: `url('/company-bg.jpg')` }}>
+      
+      {/* Modern Deep Overlay with Blur matching login vibe */}
+      <div className="absolute inset-0 bg-[#0d0f12]/85 backdrop-blur-md pointer-events-none fixed" />
+
+      {/* Desktop sidebar - Glassmorphism style */}
+      <aside className="hidden md:flex flex-col w-64 bg-[#14181d]/90 text-white shrink-0 shadow-2xl border-r border-white/10 relative z-20 backdrop-blur-xl">
         {/* Logo Section */}
-        <div className="px-6 py-6 border-b border-white/10 flex items-center gap-3.5 bg-[#101214]">
-          <div className="bg-white p-2 rounded-xl shrink-0 shadow-lg">
+        <div className="px-6 py-6 border-b border-white/10 flex items-center gap-3.5 bg-[#0d0f12]/50">
+          <div className="bg-white/95 p-2 rounded-xl shrink-0 shadow-lg border border-white/20">
             <img 
               src="/logo.png" 
               alt="Logo" 
@@ -52,7 +56,7 @@ export default function Layout({ children }) {
           </div>
           <div>
             <p className="font-head font-extrabold text-base leading-tight tracking-wide text-white">Al-Esraa</p>
-            <p className="text-[10px] text-[#9E1B1B] font-bold tracking-widest uppercase mt-0.5">Optima</p>
+            <p className="text-[10px] text-rose-400 font-bold tracking-widest uppercase mt-0.5">Optima</p>
           </div>
         </div>
 
@@ -66,8 +70,8 @@ export default function Layout({ children }) {
               className={({ isActive }) =>
                 `block px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300 ${
                   isActive 
-                    ? 'bg-[#9E1B1B] text-white shadow-lg shadow-[#9E1B1B]/40 translate-x-1' 
-                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                    ? 'bg-gradient-to-r from-[#9E1B1B] to-rose-700 text-white shadow-lg shadow-red-950/50 translate-x-1' 
+                    : 'text-gray-300 hover:bg-white/10 hover:text-white'
                 }`
               }
             >
@@ -77,12 +81,12 @@ export default function Layout({ children }) {
         </nav>
 
         {/* User Profile & Logout Box */}
-        <div className="p-4 m-3 rounded-xl bg-white/5 border border-white/10 shadow-inner">
+        <div className="p-4 m-3 rounded-2xl bg-white/[0.03] border border-white/10 shadow-inner backdrop-blur-md">
           <p className="text-sm font-bold truncate text-white">{profile?.full_name}</p>
-          <p className="text-xs text-white/40 truncate mb-3">{profile?.employee_code || profile?.email}</p>
+          <p className="text-xs text-gray-400 truncate mb-3">{profile?.employee_code || profile?.email}</p>
           <button 
             onClick={handleSignOut} 
-            className="w-full py-2 px-3 rounded-lg bg-white/10 hover:bg-[#9E1B1B] text-xs text-white transition-all text-center font-bold tracking-wide border border-white/10 shadow-sm"
+            className="w-full py-2 px-3 rounded-xl bg-white/10 hover:bg-[#9E1B1B] text-xs text-white transition-all text-center font-bold tracking-wide border border-white/10 shadow-sm"
           >
             Sign out
           </button>
@@ -90,9 +94,9 @@ export default function Layout({ children }) {
       </aside>
 
       {/* Mobile top bar + drawer */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-30 bg-[#14171A] text-white flex items-center justify-between px-4 py-3 border-b border-white/10 shadow-md">
+      <div className="md:hidden fixed top-0 inset-x-0 z-30 bg-[#14181d]/95 backdrop-blur-md text-white flex items-center justify-between px-4 py-3 border-b border-white/10 shadow-md">
         <div className="flex items-center gap-2.5">
-          <div className="bg-white p-1.5 rounded-lg shrink-0">
+          <div className="bg-white/95 p-1.5 rounded-lg shrink-0 border border-white/20">
             <img 
               src="/logo.png" 
               alt="Logo" 
@@ -102,7 +106,7 @@ export default function Layout({ children }) {
           </div>
           <div>
             <p className="font-head font-bold text-sm leading-tight">Al-Esraa</p>
-            <p className="text-[9px] text-[#9E1B1B] uppercase tracking-wider font-bold">Optima</p>
+            <p className="text-[9px] text-rose-400 uppercase tracking-wider font-bold">Optima</p>
           </div>
         </div>
         <button onClick={() => setMobileOpen((v) => !v)} aria-label="Toggle menu" className="p-2 rounded-lg bg-white/10 text-white">
@@ -113,7 +117,7 @@ export default function Layout({ children }) {
       </div>
 
       {mobileOpen && (
-        <div className="md:hidden fixed top-14 inset-x-0 z-20 bg-[#14171A] text-white px-3 py-4 max-h-[80vh] overflow-y-auto border-b border-white/10 shadow-2xl space-y-1.5">
+        <div className="md:hidden fixed top-14 inset-x-0 z-20 bg-[#14181d]/95 backdrop-blur-xl text-white px-3 py-4 max-h-[80vh] overflow-y-auto border-b border-white/10 shadow-2xl space-y-1.5">
           {nav.map((item) => (
             <NavLink
               key={item.to}
@@ -122,7 +126,7 @@ export default function Layout({ children }) {
               onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
                 `block px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-                  isActive ? 'bg-[#9E1B1B] text-white shadow' : 'text-white/70 hover:bg-white/10'
+                  isActive ? 'bg-[#9E1B1B] text-white shadow' : 'text-gray-300 hover:bg-white/10'
                 }`
               }
             >
@@ -141,7 +145,7 @@ export default function Layout({ children }) {
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 min-w-0 pt-16 md:pt-0 bg-[#f4f6f9]">
+      <main className="flex-1 min-w-0 pt-16 md:pt-0 relative z-10 text-white">
         <div className="max-w-6xl mx-auto p-4 md:p-8">{children}</div>
       </main>
     </div>
