@@ -13,7 +13,7 @@ export default function Employees() {
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(emptyForm)
-  const [saving, setSaving]  = useState(false)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [importResult, setImportResult] = useState(null)
   const fileRef = useRef(null)
@@ -32,49 +32,17 @@ export default function Employees() {
     setError('')
 
     try {
-      // 1. إنشاء المستخدم في جدول الـ Auth باستخدام Supabase Auth API العادي
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: form.email,
-        password: form.password || 'Password123!',
-        options: {
-          data: {
-            full_name: form.full_name,
-            role: form.role,
-          }
-        }
+      const { error: rpcError } = await supabase.rpc('admin_create_user', {
+        target_email: form.email,
+        target_password: form.password || 'Password123!',
+        target_full_name: form.full_name,
+        target_role: form.role,
+        target_department_id: form.department_id || null,
+        target_job_title_id: form.job_title_id || null,
+        target_hire_date: form.hire_date || null
       })
 
-      if (authError) throw authError
-
-      const userId = authData.user?.id
-      if (userId) {
-        // 2. تحديث أو إدخال البيانات الإضافية في جدول profiles
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({
-            full_name: form.full_name,
-            role: form.role,
-            department_id: form.department_id || null,
-            job_title_id: form.job_title_id || null,
-            hire_date: form.hire_date || null,
-            is_active: true
-          })
-          .eq('id', userId)
-
-        if (profileError) {
-          // لو الـ trigger موقفه أو عامل مشكلة، نعمل upsert
-          await supabase.from('profiles').upsert({
-            id: userId,
-            email: form.email,
-            full_name: form.full_name,
-            role: form.role,
-            department_id: form.department_id || null,
-            job_title_id: form.job_title_id || null,
-            hire_date: form.hire_date || null,
-            is_active: true
-          })
-        }
-      }
+      if (rpcError) throw rpcError
 
       setSaving(false)
       setShowForm(false)
@@ -115,24 +83,16 @@ export default function Employees() {
           const dept = departments.find((d) => d.name.toLowerCase() === (row['Department'] || '').toLowerCase())
           
           try {
-            const { data: authData, error: authError } = await supabase.auth.signUp({
-              email: row['Email'],
-              password: 'Password123!',
-              options: { data: { full_name: row['Name'], role: 'employee' } }
+            const { error: rpcError } = await supabase.rpc('admin_create_user', {
+              target_email: row['Email'],
+              target_password: 'Password123!',
+              target_full_name: row['Name'],
+              target_role: 'employee',
+              target_department_id: dept?.id || null,
+              target_job_title_id: null,
+              target_hire_date: row['Hire Date'] || null
             })
-            if (authError) throw authError
-
-            if (authData.user?.id) {
-              await supabase.from('profiles').upsert({
-                id: authData.user.id,
-                email: row['Email'],
-                full_name: row['Name'],
-                role: 'employee',
-                department_id: dept?.id || null,
-                hire_date: row['Hire Date'] || null,
-                is_active: true
-              })
-            }
+            if (rpcError) throw rpcError
             success++
           } catch (err) {
             errors.push(`${row['Email']}: ${err.message}`)
