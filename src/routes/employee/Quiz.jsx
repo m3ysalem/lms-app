@@ -10,7 +10,7 @@ export default function Quiz() {
   const { courseId } = useParams()
   const { profile } = useAuth()
   const [course, setCourse] = useState(null)
-  const- [quiz, setQuiz] = useState(null)
+  const [quiz, setQuiz] = useState(null)
   const [questions, setQuestions] = useState([])
   const [attemptId, setAttemptId] = useState(null)
   const [answers, setAnswers] = useState({})
@@ -21,14 +21,12 @@ export default function Quiz() {
 
   const loadRealData = useCallback(async () => {
     try {
-      // 1. جلب هيكل الكورس كاملاً عبر دالة الـ API التي تضمن جلب الاختبار والأسئلة بالطريقة الصحيحة للمشروع
       const courseData = await getCourseWithStructure(courseId)
       setCourse(courseData?.course || null)
 
       let foundQuiz = courseData?.quiz || null
       let qList = courseData?.questions || courseData?.quiz_questions || []
 
-      // إذا لم يرجع الهيكل الاختبار، نبحث عنه في جدول quizzes
       if (!foundQuiz) {
         const { data: quizData } = await supabase
           .from('quizzes')
@@ -40,9 +38,7 @@ export default function Quiz() {
 
       setQuiz(foundQuiz)
 
-      // إذا كانت قائمة الأسئلة فارغة، نبحث بجميع الجداول المحتملة التي قد يستخدمها مشروعك
       if ((!qList || qList.length === 0) && foundQuiz?.id) {
-        // محاولة البحث في جدول الأسئلة البديلة إن وجدت
         const possibleTables = ['quiz_questions', 'assessment_questions', 'course_questions', 'exam_questions']
         for (const tbl of possibleTables) {
           try {
@@ -55,7 +51,6 @@ export default function Quiz() {
         }
       }
 
-      // تجهيز وفلترة الأسئلة والإجابات
       setQuestions(Array.isArray(qList) ? qList : [])
 
     } catch (e) {
