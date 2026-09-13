@@ -7,7 +7,6 @@ import {
 } from '../../lib/api'
 import { Badge, ProgressBar, Spinner } from '../../components/Ui'
 
-// دالة لتحويل أي رابط يوتيوب لصيغة الـ Embed الصحيحة لمنع مشاكل الرفض
 function getEmbedUrl(url) {
   if (!url) return ''
   if (url.includes('embed/')) return url
@@ -40,17 +39,18 @@ export default function CoursePlayer() {
     ])
       .then(([d, lp, certs]) => {
         setData(d)
-        setLessonProgress(lp)
-        setCertificate(certs.find((c) => c.course.id === courseId) || null)
-        const firstIncomplete = d.modules.flatMap((m) => m.lessons).find((l) => lp[l.id]?.status !== 'completed')
-        setActiveLessonId(firstIncomplete?.id ?? d.modules[0]?.lessons[0]?.id ?? null)
+        setLessonProgress(lp || {})
+        setCertificate(certs?.find((c) => c.course?.id === courseId) || null)
+        const allL = d.modules?.flatMap((m) => m.lessons) || []
+        const firstIncomplete = allL.find((l) => lp?.[l.id]?.status !== 'completed')
+        setActiveLessonId(firstIncomplete?.id ?? allL[0]?.id ?? null)
       })
       .catch((e) => setError(e.message))
   }, [courseId, profile?.id])
 
   useEffect(() => { load() }, [load])
 
-  const allLessons = useMemo(() => data ? data.modules.flatMap((m) => m.lessons) : [], [data])
+  const allLessons = useMemo(() => data?.modules ? data.modules.flatMap((m) => m.lessons) : [], [data])
   const activeLesson = allLessons.find((l) => l.id === activeLessonId)
   const completedCount = allLessons.filter((l) => lessonProgress[l.id]?.status === 'completed').length
   const percent = allLessons.length ? Math.round((completedCount / allLessons.length) * 100) : 0
@@ -71,17 +71,16 @@ export default function CoursePlayer() {
     if (next) setActiveLessonId(next.id)
   }
 
-  if (error) return <div className="text-danger">{error}</div>
+  if (error) return <div className="text-danger p-4">{error}</div>
   if (!data) return <Spinner />
 
   const { course, quiz } = data
-  const allLessonsComplete = allLessons.length > 0 && completedCount === allLessons.length
 
   return (
     <div className="space-y-6">
       <div>
         <Link to="/courses" className="text-sm text-teal hover:underline">← Back to catalog</Link>
-        <h1 className="text-2xl font-bold mt-2">{course.name}</h1>
+        <h1 className="text-2xl font-bold mt-2">{course?.name}</h1>
         <div className="flex items-center gap-3 mt-2">
           <div className="w-48"><ProgressBar percent={percent} /></div>
           <span className="text-sm text-muted">{percent}% complete</span>
@@ -92,10 +91,10 @@ export default function CoursePlayer() {
       <div className="grid md:grid-cols-[280px_1fr] gap-6">
         {/* Lesson navigator */}
         <aside className="card p-3 h-fit">
-          {data.modules.map((m) => (
+          {data.modules?.map((m) => (
             <div key={m.id} className="mb-3 last:mb-0">
               <p className="text-xs font-semibold text-muted uppercase tracking-wide px-2 mb-1">{m.title}</p>
-              {m.lessons.map((l) => {
+              {m.lessons?.map((l) => {
                 const status = lessonProgress[l.id]?.status
                 const isActive = l.id === activeLessonId
                 return (
@@ -116,9 +115,9 @@ export default function CoursePlayer() {
           {quiz && (
             <Link
               to={`/courses/${courseId}/quiz`}
-              className={`block mt-2 px-2 py-2 rounded text-sm ${allLessonsComplete ? 'text-teal font-medium hover:bg-surface' : 'text-muted pointer-events-none'}`}
+              className="block mt-2 px-2 py-2 rounded text-sm text-teal font-medium hover:bg-surface"
             >
-              {allLessonsComplete ? '📝 Take the quiz →' : '📝 Quiz (complete all lessons first)'}
+              📝 Take Course Quiz →
             </Link>
           )}
         </aside>
