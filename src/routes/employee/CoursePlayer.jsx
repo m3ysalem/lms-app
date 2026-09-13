@@ -113,12 +113,12 @@ export default function CoursePlayer() {
             </div>
           ))}
           
-          {/* زر الاختبار مع لون نص أسود صريح */}
+          {/* زر الاختبار مع عنصر span داخلي لإجبار اللون الأسود */}
           <Link
             to={`/courses/${courseId}/quiz`}
-            style={{ backgroundColor: '#ccfbf1', color: '#000000', display: 'block', marginTop: '16px', padding: '10px 12px', borderRadius: '8px', fontWeight: 'bold', textAlign: 'center', textDecoration: 'none' }}
+            style={{ backgroundColor: '#ccfbf1', display: 'block', marginTop: '16px', padding: '10px 12px', borderRadius: '8px', textAlign: 'center', textDecoration: 'none' }}
           >
-            📝 Take Course Quiz →
+            <span style={{ color: '#000000', fontWeight: 'bold', fontSize: '14px' }}>📝 Take Course Quiz →</span>
           </Link>
         </aside>
 
@@ -156,16 +156,16 @@ export default function CoursePlayer() {
               )}
 
               <div className="flex items-center justify-between mt-8 pt-4 border-t border-surface-border">
-                {/* زر السابق مع لون نص أسود صريح وزر فعال */}
+                {/* زر السابق مع span داخلي لإجبار اللون الأسود */}
                 <button
-                  style={{ backgroundColor: '#e5e7eb', color: '#000000', padding: '8px 16px', borderRadius: '6px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}
+                  style={{ backgroundColor: '#e5e7eb', padding: '8px 16px', borderRadius: '6px', border: 'none', cursor: 'pointer' }}
                   disabled={allLessons.findIndex((l) => l.id === activeLesson.id) === 0}
                   onClick={() => {
                     const idx = allLessons.findIndex((l) => l.id === activeLesson.id)
                     if (idx > 0) setActiveLessonId(allLessons[idx - 1].id)
                   }}
                 >
-                  ← Previous
+                  <span style={{ color: '#000000', fontWeight: 'bold' }}>← Previous</span>
                 </button>
                 <button className="btn-primary" onClick={completeAndAdvance}>
                   {lessonProgress[activeLesson.id]?.status === 'completed' ? 'Next lesson →' : 'Mark complete & continue'}
