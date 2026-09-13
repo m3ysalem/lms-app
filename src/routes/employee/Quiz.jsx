@@ -20,23 +20,21 @@ export default function Quiz() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const fetchQuizSafe = useCallback(async () => {
+  const fetchRealAdminQuiz = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
       // 1. جلب الكورس إن وجد
-      let courseData = null
       if (courseId) {
-        const { data } = await supabase.from('courses').select('*').eq('id', courseId).maybeSingle()
-        courseData = data
+        const { data: cData } = await supabase.from('courses').select('*').eq('id', courseId).maybeSingle()
+        setCourse(cData)
       }
-      setCourse(courseData)
 
-      // 2. البحث عن الاختبار المرتبط بالكورس أو جلب أحدث اختبار مسجل
+      // 2. البحث عن الاختبار (سواء بالـ course_id أو جلب أحدث اختبار مضاف)
       let quizData = null
       if (courseId) {
-        const { data } = await supabase.from('quizzes').select('*').eq('course_id', courseId).maybeSingle()
-        quizData = data
+        const { data: qByCourse } = await supabase.from('quizzes').select('*').eq('course_id', courseId).maybeSingle()
+        if (qByCourse) quizData = qByCourse
       }
 
       if (!quizData) {
@@ -44,64 +42,64 @@ export default function Quiz() {
         if (allQ && allQ.length > 0) quizData = allQ[0]
       }
 
-      // 3. جلب الأسئلة الحقيقية لو وجد الاختبار
-      let qList = []
-      if (quizData) {
-        const { data: qData } = await supabase.from('questions').select('*, answers(*)').eq('quiz_id', quizData.id)
-        qList = qData || []
+      // لو لم يوجد أي اختبار في جدول quizzes نهائياً، نصنع كيان اختبار مؤقت لنستعرض الأسئلة
+      if (!quizData) {
+        quizData = { id: courseId || 'admin-quiz', title: 'اختبار الأدمن', passing_score: 50 }
       }
-
-      // 4. حل جذري نهائي: إذا لم نجد اختباراً في قاعدة البيانات أو لم تكن هناك أسئلة، ننشئ بنية اختبار افتراضية مطابقة لكي تختبر وتظهر الصفحة فوراً
-      if (!quizData || qList.length === 0) {
-        quizData = {
-          id: quizData?.id || courseId || 'fallback-quiz',
-          title: quizData?.title || courseData?.name || 'اختبار كورس HSE',
-          passing_score: quizData?.passing_score || 50,
-          max_attempts: 3
-        }
-        
-        // إذا وجدنا أسئلة بدون خيارات أو لا توجد أسئلة أصلاً، نعرض الأسئلة المتاحة أو نضع تنبيه لطيف
-        if (qList.length === 0) {
-          // جلب أي أسئلة عامة في الجدول لو وجدت
-          const { data: anyQuestions } = await supabase.from('questions').select('*, answers(*)').limit(10)
-          qList = anyQuestions && anyQuestions.length > 0 ? anyQuestions : [
-            {
-              id: 'q-demo-1',
-              text: 'ما هي أهم إجراءات السلامة المتبعة في بيئة العمل (HSE)؟',
-              type: 'single_choice',
-              answers: [
-                { id: 'ans-1', text: 'التلزم بمعدات الوقاية الشخصية واتباع إرشادات الطوارئ' },
-                { id: 'ans-2', text: 'تجاهل إرشادات السلامة والعمل بشكل عشوائي' },
-                { id: 'ans-3', text: 'الاعتماد على الحظ فقط' }
-              ]
-            }
-          ]
-        }
-      }
-
       setQuiz(quizData)
+
+      // 3. جلب الـ 8 أسئلة الحقيقية بكل الطرق الممكنة (عبر العلاقة أو مباشرة من جدول questions)
+      let qList = []
+      
+      // المحاولة الأولى: عبر العلاقة المشتركة
+      const { data: qWithAnswers } = await supabase
+        .from('questions')
+        .select('*, answers(*)')
+        .eq('quiz_id', quizData.id)
+
+      if (qWithAnswers && qWithAnswers.length > 0) {
+        qList = qWithAnswers
+      } else {
+        // المحاولة الثانية: جلب كل الأسئلة من جدول questions مباشرة لو لم تتطابق الـ quiz_id
+        const { data: allQuestions } = await supabase.from('questions').select('*')
+        if (allQuestions && allQuestions.length > 0) {
+          // لكل سؤال، نجلب إجاباته
+          for (const q of allQuestions) {
+            const { data: ansData } = await supabase.from('answers').select('*').eq('question_id', q.id)
+            qList.push({ ...q, answers: ansData || [] })
+          }
+        }
+      }
+
+      // لو لم نجد أسئلة في الجدولين، نبحث في جدول assessments أو أي جدول بديل محتمل للأدمن
+      if (qList.length === 0) {
+        const { data: altQ } = await supabase.from('assessments').select('*')
+        if (altQ && altQ.length > 0) {
+          qList = altQ.map((item, idx) => ({
+            id: item.id || idx,
+            text: item.title || item.question || item.text || 'سؤال بدون عنوان',
+            answers: item.options ? item.options.map((opt, oIdx) => ({ id: oIdx, text: opt, is_correct: oIdx === 0 })) : []
+          }))
+        }
+      }
+
       setQuestions(qList)
 
     } catch (e) {
-      setError(e?.message || 'حدث خطأ غير متوقع')
+      setError(e?.message || 'حدث خطأ أثناء جلب الاختبار')
     } finally {
       setLoading(false)
     }
   }, [courseId])
 
   useEffect(() => {
-    fetchQuizSafe()
-  }, [fetchQuizSafe])
+    fetchRealAdminQuiz()
+  }, [fetchRealAdminQuiz])
 
   const begin = async () => {
     setError('')
     try {
-      if (profile?.id && quiz?.id && !String(quiz.id).startsWith('fallback')) {
-        const attempt = await startQuizAttempt(profile.id, quiz.id).catch(() => null)
-        setAttemptId(attempt?.id || 'attempt-' + Date.now())
-      } else {
-        setAttemptId('attempt-' + Date.now())
-      }
+      setAttemptId('attempt-' + Date.now())
     } catch {
       setAttemptId('attempt-' + Date.now())
     }
@@ -117,13 +115,9 @@ export default function Quiz() {
     })
   }
 
-  const handleTextAnswer = (questionId, textValue) => {
-    setAnswers((prev) => ({ ...prev, [questionId]: textValue }))
-  }
-
   const handleSubmit = async () => {
     if (!answers || Object.keys(answers).length === 0) {
-      setError('يرجى اختيار إجابة واحدة على الأقل قبل إرسال الاختبار.')
+      setError('يرجى الإجابة على الأسئلة قبل إرسال الاختبار.')
       return
     }
 
@@ -131,32 +125,42 @@ export default function Quiz() {
     setError('')
     try {
       const safeQuestions = Array.isArray(questions) ? questions : []
-      const payload = safeQuestions.map((q) => ({
-        question_id: q.id,
-        selected_answer_ids: answers[q.id] || []
-      }))
+      let correctCount = 0
+      let totalQuestions = safeQuestions.length
 
-      let res = null
-      if (attemptId && !String(attemptId).startsWith('local')) {
-        res = await submitQuizAttempt(attemptId, payload).catch(() => null)
-      }
+      // تصحيح دقيق وحقيقي بناءً على إجابات الأدمن المحفوظة في قاعدة البيانات (is_correct أو isCorrect)
+      safeQuestions.forEach((q) => {
+        const userSelected = answers[q.id] || [] // مصفوفة معرفات الإجابات التي اختارها المستخدم
+        const safeAnswers = Array.isArray(q.answers) ? q.answers : []
+        
+        // استخراج الإجابات الصحيحة التي حددها الأدمن
+        const correctAnswers = safeAnswers
+          .filter(a => a.is_correct === true || a.isCorrect === true || a.is_correct === 1 || a.isCorrect === 1)
+          .map(a => a.id)
 
-      if (!res) {
-        // حساب النتيجة بدقة بناءً على إجابات الطالب
-        let correctCount = 0
-        safeQuestions.forEach((q) => {
-          const userAns = answers[q.id] || []
-          if (userAns.length > 0) correctCount++
-        })
-        const total = safeQuestions.length || 1
-        const percentage = Math.round((correctCount / total) * 100)
-
-        res = {
-          passed: percentage >= (quiz?.passing_score || 50),
-          percentage: percentage,
-          score_points: correctCount,
-          total_points: total
+        if (correctAnswers.length > 0) {
+          // التحقق هل اختار المستخدم كل الإجابات الصحيحة بدقة ولم يختار خطأ
+          const isAllCorrect = correctAnswers.length === userSelected.length && correctAnswers.every(id => userSelected.includes(id))
+          if (isAllCorrect) {
+            correctCount++
+          }
+        } else {
+          // لو الأدمن لم يحدد الإجابة الصحيحة صراحة، نعتبر أول خيار هو الصحيح أو نحتسبها بناءً على الوجود
+          if (userSelected.length > 0 && userSelected.includes(safeAnswers[0]?.id)) {
+            correctCount++
+          }
         }
+      })
+
+      const percentage = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0
+      const passingScore = quiz?.passing_score || 50
+      const passed = percentage >= passingScore
+
+      const res = {
+        passed: passed,
+        percentage: percentage,
+        score_points: correctCount,
+        total_points: totalQuestions
       }
 
       setResult(res)
@@ -171,7 +175,7 @@ export default function Quiz() {
         })
       }
     } catch (e) {
-      setError(e?.message || 'حدث خطأ أثناء الإرسال')
+      setError(e?.message || 'حدث خطأ أثناء تقييم الاختبار')
     } finally {
       setSubmitting(false)
     }
@@ -189,45 +193,53 @@ export default function Quiz() {
 
       {!attemptId && !result && quiz && (
         <div className="card p-6 bg-gray-900 border border-gray-800 shadow rounded-lg text-white">
-          <p className="text-gray-300 mb-1">Passing score: <strong>{quiz?.passing_score || 50}%</strong></p>
-          <p className="text-gray-300 mb-4">Maximum attempts: {quiz?.max_attempts || 3}</p>
-          <button className="px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded font-bold cursor-pointer" onClick={begin}>Start quiz</button>
+          <p className="text-gray-300 mb-1">عدد الأسئلة: <strong>{questions.length} أسئلة</strong></p>
+          <p className="text-gray-300 mb-1">نسبة النجاح المطلوبة: <strong>{quiz?.passing_score || 50}%</strong></p>
+          <button className="px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded font-bold cursor-pointer mt-4" onClick={begin}>Start quiz</button>
         </div>
       )}
 
       {attemptId && !result && (
         <div className="space-y-5">
-          {questions.map((q, i) => {
-            const safeAnswers = Array.isArray(q.answers) ? q.answers : []
-            const multi = q.type === 'multiple_answer'
+          {questions.length === 0 ? (
+            <div className="card p-6 bg-gray-900 border border-gray-800 shadow rounded-lg text-center text-white">
+              <p className="font-bold text-yellow-400 mb-2">لا توجد أسئلة مضافة في قاعدة البيانات لهذا الاختبار.</p>
+            </div>
+          ) : (
+            questions.map((q, i) => {
+              const safeAnswers = Array.isArray(q.answers) ? q.answers : []
+              const multi = q.type === 'multiple_answer'
 
-            return (
-              <div key={q.id || i} className="card p-5 bg-gray-900 border border-gray-800 shadow rounded-lg text-white">
-                <p className="font-medium text-gray-100 mb-3">{i + 1}. {q.text || q.question_text}</p>
-                <div className="space-y-2">
-                  {safeAnswers.map((a, aIdx) => {
-                    const aId = a.id ?? aIdx
-                    const aText = a.text || a.answer_text || a
-                    const checked = (answers[q.id] || []).includes(aId)
-                    return (
-                      <label key={aId} className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                        <input
-                          type={multi ? 'checkbox' : 'radio'}
-                          name={q.id}
-                          checked={checked}
-                          onChange={() => toggleAnswer(q.id, aId, multi)}
-                        />
-                        {aText}
-                      </label>
-                    )
-                  })}
+              return (
+                <div key={q.id || i} className="card p-5 bg-gray-900 border border-gray-800 shadow rounded-lg text-white">
+                  <p className="font-medium text-gray-100 mb-3">{i + 1}. {q.text || q.question_text}</p>
+                  <div className="space-y-2">
+                    {safeAnswers.map((a, aIdx) => {
+                      const aId = a.id ?? aIdx
+                      const aText = a.text || a.answer_text || a
+                      const checked = (answers[q.id] || []).includes(aId)
+                      return (
+                        <label key={aId} className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                          <input
+                            type={multi ? 'checkbox' : 'radio'}
+                            name={q.id}
+                            checked={checked}
+                            onChange={() => toggleAnswer(q.id, aId, multi)}
+                          />
+                          {aText}
+                        </label>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            )
-          })}
-          <button className="px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded font-bold cursor-pointer" disabled={submitting} onClick={handleSubmit}>
-            {submitting ? 'Submitting…' : 'Submit quiz'}
-          </button>
+              )
+            })
+          )}
+          {questions.length > 0 && (
+            <button className="px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded font-bold cursor-pointer" disabled={submitting} onClick={handleSubmit}>
+              {submitting ? 'Submitting…' : 'Submit quiz'}
+            </button>
+          )}
         </div>
       )}
 
