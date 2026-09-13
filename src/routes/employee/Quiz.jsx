@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { getCourseWithStructure, startQuizAttempt, submitQuizAttempt, issueCertificate } from '../../lib/api'
+import { startQuizAttempt, submitQuizAttempt, issueCertificate } from '../../lib/api'
 import { downloadCertificatePdf } from '../../lib/certificate'
 import { Spinner, Badge } from '../../components/Ui'
 import { supabase } from '../../lib/supabaseClient'
@@ -12,73 +12,74 @@ export default function Quiz() {
   const [course, setCourse] = useState(null)
   const [quiz, setQuiz] = useState(null)
   const [questions, setQuestions] = useState([])
-  const [attemptId, setAttemptId] = useState(null)
+  const [attemptId, setAttemptId]  = useState(null)
   const [answers, setAnswers] = useState({})
   const [result, setResult] = useState(null)
   const [certificate, setCertificate] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
 
-  const loadRealData = useCallback(async () => {
+  const fetchAdminQuiz = useCallback(async () => {
     if (!courseId) return
+    setLoading(true)
+    setError('')
     try {
-      const courseData = await getCourseWithStructure(courseId).catch(() => null)
-      setCourse(courseData?.course || null)
+      // 1. جلب الكورس للتأكد من وجوده
+      const { data: courseData } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', courseId)
+        .maybeSingle()
+      
+      setCourse(courseData)
 
-      let foundQuiz = courseData?.quiz || null
-      let qList = courseData?.questions || courseData?.quiz_questions || []
+      // 2. جلب الاختبار الحقيقي الذي أنشأه الأدمن مرتبطة بهذا الـ course_id
+      const { data: quizData, error: quizErr } = await supabase
+        .from('quizzes')
+        .select('*')
+        .eq('course_id', courseId)
+        .maybeSingle()
 
-      if (!foundQuiz) {
-        const { data: quizData } = await supabase
-          .from('quizzes')
-          .select('*')
-          .eq('course_id', courseId)
-          .maybeSingle()
-        foundQuiz = quizData
+      if (quizErr || !quizData) {
+        setError('لا يوجد اختبار مرتبطة بهذا الكورس في قاعدة البيانات حالياً.')
+        setLoading(false)
+        return
       }
 
-      if (!foundQuiz) {
-        foundQuiz = {
-          id: courseId,
-          title: courseData?.course?.name ? `اختبار كورس: ${courseData.course.name}` : 'HSE اختبار كورس',
-          passing_score: 50,
-          max_attempts: 3
-        }
+      setQuiz(quizData)
+
+      // 3. جلب الأسئلة الحقيقية التابعة لهذا الاختبار مع خيارات الإجابات
+      const { data: questionsData, error: qErr } = await supabase
+        .from('questions')
+        .select('*, answers(*)')
+        .eq('quiz_id', quizData.id)
+
+      if (qErr) {
+        console.error('Error fetching questions:', qErr.message)
       }
 
-      setQuiz(foundQuiz)
+      setQuestions(questionsData || [])
 
-      if ((!qList || qList.length === 0) && foundQuiz?.id) {
-        const possibleTables = ['quiz_questions', 'assessment_questions', 'course_questions', 'questions']
-        for (const tbl of possibleTables) {
-          try {
-            const { data } = await supabase.from(tbl).select('*, answers(*)').eq('quiz_id', foundQuiz.id)
-            if (data && data.length > 0) {
-              qList = data
-              break
-            }
-          } catch {}
-        }
-      }
-
-      setQuestions(Array.isArray(qList) ? qList : [])
     } catch (e) {
-      setError(e?.message || 'حدث خطأ أثناء تحميل البيانات')
+      setError(e?.message || 'حدث خطأ أثناء جلب بيانات الاختبار')
+    } finally {
+      setLoading(false)
     }
   }, [courseId])
 
   useEffect(() => {
-    loadRealData()
-  }, [loadRealData])
+    fetchAdminQuiz()
+  }, [fetchAdminQuiz])
 
   const begin = async () => {
     setError('')
     try {
       if (!profile?.id || !quiz?.id) return
       const attempt = await startQuizAttempt(profile.id, quiz.id).catch(() => null)
-      setAttemptId(attempt?.id || 'local-attempt-' + Date.now())
+      setAttemptId(attempt?.id || 'admin-attempt-' + Date.now())
     } catch {
-      setAttemptId('local-attempt-' + Date.now())
+      setAttemptId('admin-attempt-' + Date.now())
     }
   }
 
@@ -136,12 +137,13 @@ export default function Quiz() {
     }
   }
 
-  if (!quiz && !error) return <div className="p-8 text-center"><Spinner /></div>
+  if (loading) return <div className="p-8 text-center"><Spinner /></div>
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 p-4">
       <Link to={`/courses/${courseId}`} className="text-sm text-teal-400 hover:underline font-bold">← Back to course</Link>
-      <h1 className="text-2xl font-bold text-white">{quiz?.title || 'HSE اختبار كورس'}</h1>
+      
+      <h1 className="text-2xl font-bold text-white">{quiz?.title || course?.name || 'اختبار الكورس'}</h1>
 
       {error && <div className="text-sm text-red-400 bg-red-950 border border-red-800 rounded px-3 py-2">{error}</div>}
 
@@ -158,18 +160,18 @@ export default function Quiz() {
         <div className="space-y-5">
           {questions.length === 0 ? (
             <div className="card p-6 bg-gray-900 border border-gray-800 shadow rounded-lg text-center text-white">
-              <p className="mb-2 font-bold">لا توجد أسئلة مضافة لهذا الاختبار حتى الآن.</p>
-              <p className="text-sm text-gray-400">تأكد من حفظ الأسئلة من حساب الأدمن.</p>
+              <p className="mb-2 font-bold">الاختبار موجود، ولكن لم يتم العثور على أسئلة مرتبطة به في جدول الأسئلة.</p>
+              <p className="text-sm text-gray-400">تأكد من ربط الأسئلة بـ quiz_id الصحيح من لوحة الأدمن.</p>
             </div>
           ) : (
             questions.map((q, i) => {
-              const safeAnswers = Array.isArray(q.answers) ? q.answers : (q.options || [])
+              const safeAnswers = Array.isArray(q.answers) ? q.answers : []
               const multi = q.type === 'multiple_answer'
               const isText = q.type === 'text' || q.type === 'essay'
 
               return (
                 <div key={q.id || i} className="card p-5 bg-gray-900 border border-gray-800 shadow rounded-lg text-white">
-                  <p className="font-medium text-gray-100 mb-3">{i + 1}. {q.text || q.question_text || 'سؤال'}</p>
+                  <p className="font-medium text-gray-100 mb-3">{i + 1}. {q.text}</p>
                   
                   {isText ? (
                     <textarea
@@ -181,19 +183,17 @@ export default function Quiz() {
                     />
                   ) : (
                     <div className="space-y-2">
-                      {safeAnswers.map((a, aIdx) => {
-                        const aId = a?.id ?? aIdx
-                        const aText = a?.text || a?.answer_text || a
-                        const checked = (answers[q.id] || []).includes(aId)
+                      {safeAnswers.map((a) => {
+                        const checked = (answers[q.id] || []).includes(a.id)
                         return (
-                          <label key={aId} className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                          <label key={a.id} className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
                             <input
                               type={multi ? 'checkbox' : 'radio'}
                               name={q.id}
                               checked={checked}
-                              onChange={() => toggleAnswer(q.id, aId, multi)}
+                              onChange={() => toggleAnswer(q.id, a.id, multi)}
                             />
-                            {aText}
+                            {a.text}
                           </label>
                         )
                       })}
