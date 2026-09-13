@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { supabase } from '../../lib/supabaseClient'
 
 export default function Login() {
   const { signIn, session } = useAuth()
@@ -19,18 +20,33 @@ export default function Login() {
     setBusy(true)
 
     const rawInput = email.trim()
-    const loginIdentifier = rawInput.includes('@')
-      ? rawInput
-      : `${rawInput}@alesraa.com`
+    let loginIdentifier = rawInput
 
     try {
-      const { error } = await signIn(loginIdentifier, password)
+      // لو المدخل مش إيميل (يعني غالباً كود موظف)، نروح نبحث عنه في جدول profiles
+      if (!rawInput.includes('@')) {
+        const { data: profileData, error: profileErr } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('employee_id', rawInput)
+          .maybeSingle()
+
+        if (profileErr || !profileData || !profileData.email) {
+          setBusy(false)
+          setError('كود الموظف غير مسجل أو غير صحيح.')
+          return
+        }
+        loginIdentifier = profileData.email
+      }
+
+      const { error: signErr } = await signIn(loginIdentifier, password)
       setBusy(false)
-      if (error) {
+      
+      if (signErr) {
         setError(
-          error.message === 'Invalid login credentials'
+          signErr.message === 'Invalid login credentials'
             ? 'Employee ID / Email or password is incorrect.'
-            : error.message
+            : signErr.message
         )
         return
       }
@@ -56,7 +72,6 @@ export default function Login() {
         
         {/* Brand Header & Title centered */}
         <div className="text-center flex flex-col items-center mb-8">
-          {/* تم إجبار اللون الأبيض الصريح هنا بالـ Inline Style لضمان عدم تأثره بالـ CSS العام */}
           <div 
             className="px-6 py-3.5 rounded-2xl shadow-2xl border border-white mb-4 flex items-center justify-center"
             style={{ backgroundColor: '#ffffff', opacity: 1 }}
@@ -91,7 +106,7 @@ export default function Login() {
               type="text"
               required
               className="w-full px-4 py-3.5 rounded-xl bg-[#0d0f12]/80 border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-[#9E1B1B] focus:ring-1 focus:ring-[#9E1B1B] transition-all text-sm"
-              placeholder="e.g. 1001 or admin"
+              placeholder="e.g. 1001 or admin@alesraa.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
