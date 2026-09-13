@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabaseClient'
 import { listEmployees, listDepartments, listJobTitles, updateEmployee } from '../../lib/api'
 import { Badge, Spinner } from '../../components/Ui'
 
-const emptyForm = { email: '', full_name: '', role: 'employee', department_id: '', job_title_id: '', hire_date: '' }
+const emptyForm = { email: '', full_name: '', role: 'employee', department_id: '', job_title_id: '', hire_date: '', password: 'Password123!' }
 
 export default function Employees() {
   const [employees, setEmployees] = useState(null)
@@ -13,7 +13,7 @@ export default function Employees() {
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(emptyForm)
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving]  = useState(false)
   const [error, setError] = useState('')
   const [importResult, setImportResult] = useState(null)
   const fileRef = useRef(null)
@@ -30,15 +30,60 @@ export default function Employees() {
     e.preventDefault()
     setSaving(true)
     setError('')
-    const { data, error } = await supabase.functions.invoke('admin-create-employee', { body: form })
-    setSaving(false)
-    if (error) {
-      setError(error.message || 'Failed to create employee. Is the admin-create-employee edge function deployed?')
-      return
+
+    try {
+      // 1. إنشاء المستخدم في جدول الـ Auth باستخدام Supabase Auth API العادي
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password || 'Password123!',
+        options: {
+          data: {
+            full_name: form.full_name,
+            role: form.role,
+          }
+        }
+      })
+
+      if (authError) throw authError
+
+      const userId = authData.user?.id
+      if (userId) {
+        // 2. تحديث أو إدخال البيانات الإضافية في جدول profiles
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            full_name: form.full_name,
+            role: form.role,
+            department_id: form.department_id || null,
+            job_title_id: form.job_title_id || null,
+            hire_date: form.hire_date || null,
+            is_active: true
+          })
+          .eq('id', userId)
+
+        if (profileError) {
+          // لو الـ trigger موقفه أو عامل مشكلة، نعمل upsert
+          await supabase.from('profiles').upsert({
+            id: userId,
+            email: form.email,
+            full_name: form.full_name,
+            role: form.role,
+            department_id: form.department_id || null,
+            job_title_id: form.job_title_id || null,
+            hire_date: form.hire_date || null,
+            is_active: true
+          })
+        }
+      }
+
+      setSaving(false)
+      setShowForm(false)
+      setForm(emptyForm)
+      refresh()
+    } catch (err) {
+      setSaving(false)
+      setError(err.message || 'Failed to create employee.')
     }
-    setShowForm(false)
-    setForm(emptyForm)
-    refresh()
   }
 
   const toggleActive = async (emp) => {
@@ -68,17 +113,30 @@ export default function Employees() {
             continue
           }
           const dept = departments.find((d) => d.name.toLowerCase() === (row['Department'] || '').toLowerCase())
-          const { error } = await supabase.functions.invoke('admin-create-employee', {
-            body: {
+          
+          try {
+            const { data: authData, error: authError } = await supabase.auth.signUp({
               email: row['Email'],
-              full_name: row['Name'],
-              department_id: dept?.id,
-              hire_date: row['Hire Date'] || null,
-              role: 'employee',
-            },
-          })
-          if (error) errors.push(`${row['Email']}: ${error.message}`)
-          else success++
+              password: 'Password123!',
+              options: { data: { full_name: row['Name'], role: 'employee' } }
+            })
+            if (authError) throw authError
+
+            if (authData.user?.id) {
+              await supabase.from('profiles').upsert({
+                id: authData.user.id,
+                email: row['Email'],
+                full_name: row['Name'],
+                role: 'employee',
+                department_id: dept?.id || null,
+                hire_date: row['Hire Date'] || null,
+                is_active: true
+              })
+            }
+            success++
+          } catch (err) {
+            errors.push(`${row['Email']}: ${err.message}`)
+          }
         }
         setImportResult({ success, errors })
         refresh()
@@ -130,6 +188,10 @@ export default function Employees() {
           <div>
             <label className="label">Email</label>
             <input className="input" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          </div>
+          <div>
+            <label className="label">Initial Password</label>
+            <input className="input" type="text" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Default: Password123!" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
