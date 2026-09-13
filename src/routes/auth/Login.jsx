@@ -23,7 +23,7 @@ export default function Login() {
     let loginIdentifier = rawInput
 
     try {
-      // لو المدخل مش إيميل (يعني غالباً كود موظف)، نروح نبحث عنه في جدول profiles
+      // لو المدخل مش إيميل (يعني كود موظف)، نبحث عن الإيميل المرتبط به في جدول profiles
       if (!rawInput.includes('@')) {
         const { data: profileData, error: profileErr } = await supabase
           .from('profiles')
@@ -41,7 +41,7 @@ export default function Login() {
 
       const { error: signErr } = await signIn(loginIdentifier, password)
       setBusy(false)
-      
+
       if (signErr) {
         setError(
           signErr.message === 'Invalid login credentials'
