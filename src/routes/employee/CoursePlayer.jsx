@@ -74,7 +74,7 @@ export default function CoursePlayer() {
   if (error) return <div className="text-danger p-4">{error}</div>
   if (!data) return <Spinner />
 
-  const { course, quiz } = data
+  const { course } = data
 
   return (
     <div className="space-y-6">
@@ -112,10 +112,11 @@ export default function CoursePlayer() {
               })}
             </div>
           ))}
-          {/* إجبار ظهور زر الاختبار دائماً حتى يظهر للموظف ويستطيع الدخول إليه */}
+          
+          {/* زر الاختبار مع إجبار ألوان النص والخلفية بـ Inline Style */}
           <Link
             to={`/courses/${courseId}/quiz`}
-            className="block mt-4 px-3 py-2 rounded text-sm font-semibold bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 transition-colors text-center"
+            style={{ backgroundColor: '#ccfbf1', color: '#0f766e', display: 'block', marginTop: '16px', padding: '10px 12px', borderRadius: '8px', fontWeight: '600', textAlign: 'center', textDecoration: 'none' }}
           >
             📝 Take Course Quiz →
           </Link>
@@ -155,9 +156,9 @@ export default function CoursePlayer() {
               )}
 
               <div className="flex items-center justify-between mt-8 pt-4 border-t border-surface-border">
-                {/* تم تعديل الكلاسات هنا لضمان ظهور لون الكتابة بوضوح */}
+                {/* زر السابق مع إجبار ألوان النص والخلفية لمنع تأثير الـ Theme العام */}
                 <button
-                  className="px-4 py-2 rounded font-medium bg-gray-200 text-gray-800 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: '#e5e7eb', color: '#1f2937', padding: '8px 16px', borderRadius: '6px', fontWeight: '600', border: 'none', cursor: 'pointer' }}
                   disabled={allLessons.findIndex((l) => l.id === activeLesson.id) === 0}
                   onClick={() => {
                     const idx = allLessons.findIndex((l) => l.id === activeLesson.id)
