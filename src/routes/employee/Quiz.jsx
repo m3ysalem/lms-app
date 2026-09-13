@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { getCourseWithStructure, startQuizAttempt, getQuizQuestions, submitQuizAttempt, issueCertificate } from '../../lib/api'
@@ -19,66 +19,50 @@ export default function Quiz() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    async function fetchQuizData() {
-      try {
-        // جلب تفاصيل الكورس
-        const courseData = await getCourseWithStructure(courseId)
-        setCourse(courseData?.course || null)
+  const loadQuiz = useCallback(async () => {
+    try {
+      const courseData = await getCourseWithStructure(courseId)
+      setCourse(courseData?.course || null)
 
-        // محاولة جلب الاختبار مباشرة من جدول quizzes باستخدام course_id لضمان عدم فشله
-        let foundQuiz = courseData?.quiz || null
-        if (!foundQuiz) {
-          const { data: qData } = await supabase
-            .from('quizzes')
-            .select('*')
-            .eq('course_id', courseId)
-            .maybeSingle()
-          foundQuiz = qData || null
-        }
-
-        // إذا لم يوجد اختبار مربوط بالـ course_id، نقوم بإنشاء اختبار افتراضي وهمي مؤقت لكي تختفي رسالة الخطأ وتبدأ الأسئلة بالظهور
-        if (!foundQuiz) {
-          foundQuiz = {
-            id: 'default-quiz-' + courseId,
+      let foundQuiz = courseData?.quiz || null
+      
+      // إذا لم يكن هناك اختبار مسجل لهذا الكورس، نقوم بإنشائه في قاعدة البيانات فوراً
+      if (!foundQuiz) {
+        const { data: newQ, error: createErr } = await supabase
+          .from('quizzes')
+          .insert({
+            course_id: courseId,
             title: 'اختبار الكورس',
             passing_score: 50,
-            max_attempts: 3,
-            time_limit_minutes: null
-          }
-        }
+            max_attempts: 3
+          })
+          .select()
+          .single()
 
-        setQuiz(foundQuiz)
-      } catch (e) {
-        setError(e.message)
+        if (!createErr && newQ) {
+          foundQuiz = newQ
+        }
       }
+
+      setQuiz(foundQuiz)
+    } catch (e) {
+      setError(e.message)
     }
-    fetchQuizData()
   }, [courseId])
+
+  useEffect(() => {
+    loadQuiz()
+  }, [loadQuiz])
 
   const begin = async () => {
     setError('')
     try {
       if (!quiz?.id || !profile?.id) return
       
-      // إذا كان الاختبار افتراضياً، نقوم بإنشائه حقيقياً في قاعدة البيانات أو محاكاته
-      let currentQuizId = quiz.id
-      if (currentQuizId.startsWith('default-quiz-')) {
-        const { data: newQ, err } = await supabase
-          .from('quizzes')
-          .insert({ course_id: courseId, title: 'اختبار الكورس', passing_score: 50, max_attempts: 3 })
-          .select()
-          .single()
-        if (!err && newQ) {
-          currentQuizId = newQ.id
-          setQuiz(newQ)
-        }
-      }
-
-      const attempt = await startQuizAttempt(profile.id, currentQuizId)
+      const attempt = await startQuizAttempt(profile.id, quiz.id)
       setAttemptId(attempt.id)
       
-      const qs = await getQuizQuestions(currentQuizId)
+      const qs = await getQuizQuestions(quiz.id)
       setQuestions(Array.isArray(qs) ? qs : [])
     } catch (e) {
       setError(e.message)
@@ -129,13 +113,13 @@ export default function Quiz() {
   }
 
   if (!course) return <Spinner />
-  if (!quiz) return <p className="text-muted">This course has no quiz configured.</p>
+  if (!quiz) return <p className="text-muted p-4">This course has no quiz configured.</p>
 
   const safeQuestionsList = Array.isArray(questions) ? questions : []
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 p-4">
-      <Link to={`/courses/${courseId}`} className="text-sm text-teal hover:underline">← Back to course</Link>
+      <Link to={`/courses/${courseId}`} className="text-sm text-teal hover:underline font-bold">← Back to course</Link>
       <h1 className="text-2xl font-bold">{quiz.title}</h1>
 
       {error && <div className="text-sm text-danger bg-danger-light border border-danger-light rounded px-3 py-2">{error}</div>}
@@ -153,7 +137,8 @@ export default function Quiz() {
         <div className="space-y-5">
           {safeQuestionsList.length === 0 ? (
             <div className="card p-6 bg-white shadow rounded-lg text-center">
-              <p className="text-ink-700 mb-4">No questions added to this quiz yet by the admin.</p>
+              <p className="text-ink-700 mb-2 font-bold">No questions added to this quiz yet.</p>
+              <p className="text-sm text-muted">You can add questions from the admin dashboard for this course.</p>
             </div>
           ) : (
             safeQuestionsList.map((q, i) => {
