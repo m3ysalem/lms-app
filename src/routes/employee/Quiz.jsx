@@ -218,7 +218,10 @@ export default function Quiz() {
     <div className="max-w-2xl mx-auto space-y-6 p-4 text-white">
       <Link to={`/courses/${courseId || ''}`} className="text-sm text-teal-400 hover:underline font-bold">← Back to course</Link>
       
-      <h1 className="text-2xl font-bold">{quiz?.title || (course?.name ? `الاختبار النهائي — ${course.name}` : 'الاختبار النهائي')}</h1>
+      {/* تم تعديل هذا السطر وإضافة text-white ليظهر العنوان بوضوح */}
+      <h1 className="text-2xl font-bold text-white mb-4">
+        {quiz?.title || (course?.name ? `الاختبار النهائي — ${course.name}` : 'الاختبار النهائي')}
+      </h1>
 
       {error && <div className="text-sm text-red-400 bg-red-950 border border-red-800 rounded p-3 font-semibold">{error}</div>}
 
@@ -234,7 +237,7 @@ export default function Quiz() {
               <p className="text-red-400 font-bold">لا توجد أسئلة في جدول `quiz_questions` تطابق هذا الاختبار.</p>
             </div>
           ) : (
-            <button className="px-5 py-2.5 bg-red-700 hover:bg-red-800 text-white rounded font-bold cursor-pointer transition-all" onClick={beginQuiz}>Start quiz</button>
+            <button className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded font-bold cursor-pointer transition-all" onClick={beginQuiz}>Start quiz</button>
           )}
         </div>
       ) : attemptId && !result ? (
@@ -248,7 +251,7 @@ export default function Quiz() {
             return (
               <div key={q.id || i} className={`card p-5 bg-gray-900 border ${answered ? 'border-teal-800' : 'border-gray-800'} rounded-lg shadow`}>
                 <div className="flex justify-between items-center mb-3">
-                  <p className="font-semibold text-gray-100">{i + 1}. {q.text}</p>
+                  <p className="font-semibold text-gray-100 text-lg">{i + 1}. {q.text}</p>
                   {answered && <span className="text-xs bg-teal-900 text-teal-300 px-2 py-0.5 rounded">تمت الإجابة</span>}
                 </div>
 
@@ -261,22 +264,22 @@ export default function Quiz() {
                     onChange={(e) => handleTextChange(q.id, e.target.value)}
                   />
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2 mt-4">
                     {(q.answers || []).map((a, aIdx) => {
                       const aId = a.id ?? aIdx
                       const selectedList = Array.isArray(currentAns) ? currentAns : []
                       const checked = selectedList.includes(aId)
 
                       return (
-                        <label key={aId} className={`flex items-center gap-3 text-sm p-2.5 rounded cursor-pointer border ${checked ? 'border-teal-600 bg-teal-950/40 text-teal-200' : 'border-gray-800 bg-gray-900/50 text-gray-300 hover:bg-gray-800'}`}>
+                        <label key={aId} className={`flex items-center gap-3 p-3 rounded cursor-pointer border transition-all ${checked ? 'border-teal-600 bg-teal-950/40 text-teal-200' : 'border-gray-800 bg-gray-900/50 text-gray-300 hover:bg-gray-800 hover:border-gray-600'}`}>
                           <input 
                             type={isMultiple ? 'checkbox' : 'radio'} 
                             name={`q_${q.id}`} 
                             checked={checked} 
                             onChange={() => handleSelectOption(q.id, aId, isMultiple)} 
-                            className="accent-teal-500" 
+                            className="accent-teal-500 w-4 h-4 cursor-pointer" 
                           />
-                          <span>{a.text}</span>
+                          <span className="text-base">{a.text}</span>
                         </label>
                       )
                     })}
@@ -288,7 +291,7 @@ export default function Quiz() {
           
           {questions.length > 0 && (
             <button 
-              className="w-full py-3.5 bg-red-700 hover:bg-red-800 text-white rounded-lg font-bold cursor-pointer shadow-lg transition-all" 
+              className="w-full py-3.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold cursor-pointer shadow-lg transition-all text-lg mt-6" 
               disabled={submitting} 
               onClick={handleSubmit}
             >
@@ -309,7 +312,7 @@ export default function Quiz() {
               <h2 className="text-2xl font-bold text-white">شهادة اجتياز الكورس</h2>
               <p className="text-sm text-gray-300">منحت للمتدرّب: <strong className="text-teal-300">{profile?.full_name || 'User'}</strong></p>
               <button
-                className="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold cursor-pointer shadow"
+                className="px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold cursor-pointer shadow-lg transition-all"
                 onClick={() => downloadCertificatePdf({
                   cert_number: certificate?.cert_number,
                   employee_name: profile?.full_name || 'User',
@@ -324,7 +327,7 @@ export default function Quiz() {
             </div>
           )}
 
-          <div className="text-center">
+          <div className="text-center mt-6">
             <Link to={`/courses/${courseId || ''}`} className="text-sm text-teal-400 hover:underline font-bold">← العودة إلى صفحة الكورس</Link>
           </div>
         </div>
