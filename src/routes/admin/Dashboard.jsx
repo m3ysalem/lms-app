@@ -50,10 +50,10 @@ export default function AdminDashboard() {
   if (!stats) return <Spinner />
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 text-white">
       <div>
-        <h1 className="text-2xl font-bold">Admin dashboard</h1>
-        <p className="text-muted mt-1">Core KPIs — the full analytics dashboard (charts, training matrix, department breakdowns) ships in Phase 2.</p>
+        <h1 className="text-3xl font-black font-head tracking-wide text-white">Admin dashboard</h1>
+        <p className="text-gray-400 mt-1 text-sm">Core KPIs — the full analytics dashboard (charts, training matrix, department breakdowns) ships in Phase 2.</p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -66,29 +66,29 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <Link to="/admin/employees" className="card p-4 hover:border-teal transition-colors">
-          <p className="font-medium text-ink-800">Manage employees</p>
-          <p className="text-sm text-muted mt-1">Add, edit, deactivate, and import employees.</p>
+        <Link to="/admin/employees" className="p-5 rounded-2xl bg-[#14181d]/85 border border-white/10 backdrop-blur-xl block hover:border-rose-500/50 transition-all shadow-xl">
+          <p className="font-semibold text-white text-base">Manage employees</p>
+          <p className="text-sm text-gray-400 mt-1">Add, edit, deactivate, and import employees.</p>
         </Link>
-        <Link to="/admin/courses" className="card p-4 hover:border-teal transition-colors">
-          <p className="font-medium text-ink-800">Manage courses</p>
-          <p className="text-sm text-muted mt-1">Build modules, lessons, materials and quizzes.</p>
+        <Link to="/admin/courses" className="p-5 rounded-2xl bg-[#14181d]/85 border border-white/10 backdrop-blur-xl block hover:border-rose-500/50 transition-all shadow-xl">
+          <p className="font-semibold text-white text-base">Manage courses</p>
+          <p className="text-sm text-gray-400 mt-1">Build modules, lessons, materials and quizzes.</p>
         </Link>
-        <Link to="/admin/assignments" className="card p-4 hover:border-teal transition-colors">
-          <p className="font-medium text-ink-800">Assignments</p>
-          <p className="text-sm text-muted mt-1">Assign courses to individuals, groups or departments.</p>
+        <Link to="/admin/assignments" className="p-5 rounded-2xl bg-[#14181d]/85 border border-white/10 backdrop-blur-xl block hover:border-rose-500/50 transition-all shadow-xl">
+          <p className="font-semibold text-white text-base">Assignments</p>
+          <p className="text-sm text-gray-400 mt-1">Assign courses to individuals, groups or departments.</p>
         </Link>
       </div>
 
       <section>
-        <h2 className="font-head font-semibold text-lg mb-3">Overdue training</h2>
-        <div className="card divide-y divide-surface-border">
-          {overdue.length === 0 && <p className="p-4 text-sm text-muted">Nothing overdue right now.</p>}
+        <h2 className="font-head font-bold text-lg mb-3 text-white">Overdue training</h2>
+        <div className="rounded-2xl bg-[#14181d]/85 border border-white/10 backdrop-blur-xl divide-y divide-white/10 overflow-hidden shadow-xl">
+          {overdue.length === 0 && <p className="p-5 text-sm text-gray-400">Nothing overdue right now.</p>}
           {overdue.map((o) => (
-            <div key={o.id} className="p-3 flex items-center justify-between text-sm">
+            <div key={o.id} className="p-4 flex items-center justify-between text-sm hover:bg-white/[0.02] transition-colors">
               <div>
-                <p className="font-medium text-ink-800">{o.employee?.full_name}</p>
-                <p className="text-muted">{o.course?.name}</p>
+                <p className="font-semibold text-white">{o.employee?.full_name}</p>
+                <p className="text-gray-400 text-xs mt-0.5">{o.course?.name}</p>
               </div>
               <Badge tone="danger">Due {o.due_date}</Badge>
             </div>
