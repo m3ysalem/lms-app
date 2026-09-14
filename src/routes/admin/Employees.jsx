@@ -42,21 +42,21 @@ export default function Employees() {
     setError('')
 
     try {
-      // لو الإيميل مش مكتوب، بنولّد إيميل وهمي فريد عشان الـ Supabase Auth لازم إيميل
       const finalEmail = form.email.trim() !== '' 
         ? form.email.trim() 
         : `emp_${form.employee_id || Date.now()}@alesraa.com`
 
+      // تم تعديل ترتيب وتسمية الـ Arguments لتطابق الدالة الصحيحة في قاعدة البيانات وتتجنب خطأ 404
       const { error: rpcError } = await supabase.rpc('admin_create_user', {
-        target_email: finalEmail,
-        target_password: form.password || 'Password123!',
-        target_full_name: form.full_name,
-        target_role: form.role,
         target_department_id: form.department_id || null,
-        target_job_title_id: form.job_title_id || null,
-        target_hire_date: form.hire_date || null,
+        target_email: finalEmail,
         target_employee_id: form.employee_id || null,
-        target_phone: form.phone || null
+        target_full_name: form.full_name,
+        target_hire_date: form.hire_date || null,
+        target_job_title_id: form.job_title_id || null,
+        target_password: form.password || 'Password123!',
+        target_phone: form.phone || null,
+        target_role: form.role
       })
 
       if (rpcError) throw rpcError
@@ -107,15 +107,15 @@ export default function Employees() {
           try {
             const rowEmail = row['Email']?.trim() || `emp_${row['Employee ID']}@alesraa.com`
             const { error: rpcError } = await supabase.rpc('admin_create_user', {
-              target_email: rowEmail,
-              target_password: row['Password'] || 'Password123!',
-              target_full_name: row['Name'],
-              target_role: row['Role'] || 'employee',
               target_department_id: dept?.id || null,
-              target_job_title_id: jtitle?.id || null,
-              target_hire_date: row['Hire Date'] || null,
+              target_email: rowEmail,
               target_employee_id: row['Employee ID'],
-              target_phone: row['Phone'] || null
+              target_full_name: row['Name'],
+              target_hire_date: row['Hire Date'] || null,
+              target_job_title_id: jtitle?.id || null,
+              target_password: row['Password'] || 'Password123!',
+              target_phone: row['Phone'] || null,
+              target_role: row['Role'] || 'employee'
             })
             if (rpcError) throw rpcError
             success++
