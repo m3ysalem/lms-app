@@ -23,17 +23,20 @@ export default function Login() {
     let loginIdentifier = rawInput
 
     try {
-      // إذا كان المدخل لا يحتوي على @، فهذا معناه أنه كود موظف (مثل 1002 أو 1003)
+      // إذا لم يكتب المستخدم علامة @ (أي أنه أدخل كود موظف مثل 1003)
       if (!rawInput.includes('@')) {
-        // نبحث عن الإيميل الفعلي المرتبط بكود الموظف من قاعدة البيانات
-        const { data: emailData, error: rpcErr } = await supabase
-          .rpc('get_email_by_employee_id', { emp_id: rawInput })
+        // نبحث مباشرة في جدول profiles عن الإيميل المرتبط بكود الموظف
+        const { data: profileData, error: profileErr } = await supabase
+          .from('profiles')
+          .select('email')
+          .or(`employee_id.eq.${rawInput},email.ilike.%${rawInput}%`)
+          .maybeSingle()
 
-        if (rpcErr || !emailData) {
-          // إذا لم يجد الكود في قاعدة البيانات، نجرب التوليد الافتراضي كخيار بديل
-          loginIdentifier = `emp_${rawInput}@alesraa.com`
+        if (profileData && profileData.email) {
+          loginIdentifier = profileData.email.trim()
         } else {
-          loginIdentifier = emailData.trim()
+          // إذا لم يجد سجلاً في البروفايل، نجرب الصيغة الافتراضية
+          loginIdentifier = `emp_${rawInput}@alesraa.com`
         }
       }
 
@@ -41,6 +44,7 @@ export default function Login() {
       setBusy(false)
       
       if (signErr) {
+        console.error('Sign in error details:', signErr)
         setError(
           signErr.message === 'Invalid login credentials'
             ? 'Employee ID / Email or password is incorrect.'
@@ -83,7 +87,7 @@ export default function Login() {
               type="text"
               required
               className="w-full px-4 py-3.5 rounded-xl bg-[#0d0f12]/80 border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-[#9E1B1B] focus:ring-1 focus:ring-[#9E1B1B] transition-all text-sm"
-              placeholder="e.g. 1002 or admin@alesraa.net"
+              placeholder="e.g. 1003 or admin@alesraa.net"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
