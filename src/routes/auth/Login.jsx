@@ -23,17 +23,9 @@ export default function Login() {
     let loginIdentifier = rawInput
 
     try {
-      // لو المدخل مش إيميل (يعني كود موظف)، نجلب الإيميل المرتبط به عن طريق الـ RPC
+      // إذا لم يكن المدخل إيميل (أي كود موظف مثل 1003)، يتم تحويله تلقائياً للإيميل الافتراضي أو جلبه
       if (!rawInput.includes('@')) {
-        const { data: emailData, error: rpcErr } = await supabase
-          .rpc('get_email_by_employee_id', { emp_id: rawInput })
-
-        if (rpcErr || !emailData) {
-          setBusy(false)
-          setError('كود الموظف غير مسجل في النظام.')
-          return
-        }
-        loginIdentifier = emailData.trim()
+        loginIdentifier = `emp_${rawInput}@alesraa.com`
       }
 
       const { error: signErr } = await signIn(loginIdentifier, password)
@@ -62,7 +54,7 @@ export default function Login() {
 
       <div className="relative z-10 w-full max-w-lg mx-4 p-8 sm:p-12 rounded-[2.5rem] bg-[#14181d]/90 border border-white/10 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl text-white">
         <div className="text-center flex flex-col items-center mb-8">
-          <div className="px-6 py-3.5 rounded-2xl shadow-2xl border border-white mb-4 flex items-center justify-center bg-white">
+          <div className="px-6 py-3.5 rounded-2xl shadow-2xl border border-white/20 mb-4 flex items-center justify-center bg-white">
             <img src="/logo.png" alt="ALESRAA PHARMACEUTICALS" className="h-10 w-auto object-contain" onError={(e) => { e.target.style.display = 'none' }} />
           </div>
           <span className="font-head font-black text-xl tracking-wider text-white block mb-1">ALESRAA PHARMACEUTICALS</span>
@@ -82,7 +74,7 @@ export default function Login() {
               type="text"
               required
               className="w-full px-4 py-3.5 rounded-xl bg-[#0d0f12]/80 border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-[#9E1B1B] focus:ring-1 focus:ring-[#9E1B1B] transition-all text-sm"
-              placeholder="e.g. 1004 or admin@alesraa.net"
+              placeholder="e.g. 1003 or admin@alesraa.net"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -119,7 +111,7 @@ export default function Login() {
         </form>
 
         <div className="text-center mt-6 pt-5 border-t border-white/5 text-[11px] text-gray-500 flex justify-between items-center">
-          <span>Default Password: <strong className="text-gray-300 font-mono">1234</strong></span>
+          <span>Default Password: <strong className="text-gray-300 font-mono">Password123!</strong></span>
           <span>© {new Date().getFullYear()} ALESRAA</span>
         </div>
       </div>
