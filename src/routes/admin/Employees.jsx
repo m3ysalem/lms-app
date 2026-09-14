@@ -4,7 +4,17 @@ import { supabase } from '../../lib/supabaseClient'
 import { listEmployees, listDepartments, listJobTitles, updateEmployee } from '../../lib/api'
 import { Badge, Spinner } from '../../components/Ui'
 
-const emptyForm = { email: '', full_name: '', role: 'employee', department_id: '', job_title_id: '', hire_date: '', password: 'Password123!' }
+const emptyForm = { 
+  employee_id: '', 
+  full_name: '', 
+  phone: '', 
+  email: '', 
+  role: 'employee', 
+  department_id: '', 
+  job_title_id: '', 
+  hire_date: '', 
+  password: 'Password123!' 
+}
 
 export default function Employees() {
   const [employees, setEmployees] = useState(null)
@@ -32,14 +42,21 @@ export default function Employees() {
     setError('')
 
     try {
+      // لو الإيميل مش مكتوب، بنولّد إيميل وهمي فريد عشان الـ Supabase Auth لازم إيميل
+      const finalEmail = form.email.trim() !== '' 
+        ? form.email.trim() 
+        : `emp_${form.employee_id || Date.now()}@alesraa.com`
+
       const { error: rpcError } = await supabase.rpc('admin_create_user', {
-        target_email: form.email,
+        target_email: finalEmail,
         target_password: form.password || 'Password123!',
         target_full_name: form.full_name,
         target_role: form.role,
         target_department_id: form.department_id || null,
         target_job_title_id: form.job_title_id || null,
-        target_hire_date: form.hire_date || null
+        target_hire_date: form.hire_date || null,
+        target_employee_id: form.employee_id || null,
+        target_phone: form.phone || null
       })
 
       if (rpcError) throw rpcError
@@ -60,6 +77,10 @@ export default function Employees() {
   }
 
   const resetPassword = async (emp) => {
+    if (!emp.email || emp.email.includes('@alesraa.com') && emp.email.startsWith('emp_')) {
+      alert('This user does not have a real email registered. You can update their password directly from Supabase if needed.')
+      return
+    }
     const { error } = await supabase.auth.resetPasswordForEmail(emp.email)
     if (error) alert(error.message)
     else alert(`Password reset email sent to ${emp.email}.`)
@@ -76,26 +97,30 @@ export default function Employees() {
         const errors = []
         let success = 0
         for (const row of rows) {
-          if (!row['Email'] || !row['Name']) {
-            errors.push(`Skipped row — missing Email or Name: ${JSON.stringify(row)}`)
+          if (!row['Name'] || !row['Employee ID']) {
+            errors.push(`Skipped row — missing Name or Employee ID: ${JSON.stringify(row)}`)
             continue
           }
           const dept = departments.find((d) => d.name.toLowerCase() === (row['Department'] || '').toLowerCase())
+          const jtitle = jobTitles.find((j) => j.title.toLowerCase() === (row['Job Title'] || '').toLowerCase())
           
           try {
+            const rowEmail = row['Email']?.trim() || `emp_${row['Employee ID']}@alesraa.com`
             const { error: rpcError } = await supabase.rpc('admin_create_user', {
-              target_email: row['Email'],
-              target_password: 'Password123!',
+              target_email: rowEmail,
+              target_password: row['Password'] || 'Password123!',
               target_full_name: row['Name'],
-              target_role: 'employee',
+              target_role: row['Role'] || 'employee',
               target_department_id: dept?.id || null,
-              target_job_title_id: null,
-              target_hire_date: row['Hire Date'] || null
+              target_job_title_id: jtitle?.id || null,
+              target_hire_date: row['Hire Date'] || null,
+              target_employee_id: row['Employee ID'],
+              target_phone: row['Phone'] || null
             })
             if (rpcError) throw rpcError
             success++
           } catch (err) {
-            errors.push(`${row['Email']}: ${err.message}`)
+            errors.push(`${row['Employee ID']}: ${err.message}`)
           }
         }
         setImportResult({ success, errors })
@@ -123,7 +148,7 @@ export default function Employees() {
         </div>
       </div>
 
-      <input className="input max-w-xs" placeholder="Search by name…" value={search} onChange={(e) => setSearch(e.target.value)} />
+      <input className="input max-w-xs" placeholder="Search by name or ID…" value={search} onChange={(e) => setSearch(e.target.value)} />
 
       {importResult && (
         <div className="card p-4 text-sm">
@@ -133,29 +158,44 @@ export default function Employees() {
               {importResult.errors.map((e, i) => <li key={i}>{e}</li>)}
             </ul>
           )}
-          <p className="text-muted mt-2">Expected columns: Employee ID, Name, Email, Department, Section, Job Title, Manager, Hire Date, Status</p>
+          <p className="text-muted mt-2">Expected columns: Employee ID, Name, Phone, Email, Department, Job Title, Hire Date, Role, Password</p>
         </div>
       )}
 
       {showForm && (
-        <form onSubmit={createEmployee} className="card p-5 space-y-3 max-w-lg">
-          <h2 className="font-head font-semibold">New employee</h2>
+        <form onSubmit={createEmployee} className="card p-5 space-y-3 max-w-xl">
+          <h2 className="font-head font-semibold text-lg">New Employee</h2>
           {error && <div className="text-sm text-danger bg-danger-light border border-danger-light rounded px-3 py-2">{error}</div>}
-          <div>
-            <label className="label">Full name</label>
-            <input className="input" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
-          </div>
-          <div>
-            <label className="label">Email</label>
-            <input className="input" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          </div>
-          <div>
-            <label className="label">Initial Password</label>
-            <input className="input" type="text" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Default: Password123!" />
-          </div>
+          
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Role</label>
+              <label className="label">Employee ID / كود الموظف *</label>
+              <input className="input" required placeholder="e.g. 1003" value={form.employee_id} onChange={(e) => setForm({ ...form, employee_id: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">Full Name / الاسم الكامل *</label>
+              <input className="input" required placeholder="e.g. Mohamed Ali" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Phone Number / رقم الموبايل</label>
+              <input className="input" type="tel" placeholder="010xxxxxxxx" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">Email / البريد الإلكتروني (اختياري)</label>
+              <input className="input" type="email" placeholder="Optional" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Password / كلمة المرور *</label>
+              <input className="input" type="text" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Password123!" />
+            </div>
+            <div>
+              <label className="label">Role / الصلاحية *</label>
               <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
                 <option value="employee">Employee</option>
                 <option value="trainer">Trainer</option>
@@ -163,28 +203,30 @@ export default function Employees() {
                 <option value="super_admin">Super Admin</option>
               </select>
             </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="label">Department</label>
+              <label className="label">Department / الإدارة</label>
               <select className="input" value={form.department_id} onChange={(e) => setForm({ ...form, department_id: e.target.value })}>
-                <option value="">—</option>
+                <option value="">— Select —</option>
                 {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Job title</label>
+              <label className="label">Job Title / المسمى الوظيفي</label>
               <select className="input" value={form.job_title_id} onChange={(e) => setForm({ ...form, job_title_id: e.target.value })}>
-                <option value="">—</option>
+                <option value="">— Select —</option>
                 {jobTitles.map((j) => <option key={j.id} value={j.id}>{j.title}</option>)}
               </select>
             </div>
             <div>
-              <label className="label">Hire date</label>
+              <label className="label">Hire Date / تاريخ التعيين</label>
               <input className="input" type="date" value={form.hire_date} onChange={(e) => setForm({ ...form, hire_date: e.target.value })} />
             </div>
           </div>
-          <div className="flex gap-2 pt-2">
+
+          <div className="flex gap-2 pt-3">
             <button className="btn-primary" disabled={saving}>{saving ? 'Creating…' : 'Create employee'}</button>
             <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
           </div>
@@ -195,9 +237,10 @@ export default function Employees() {
         <table className="w-full text-sm">
           <thead className="bg-surface text-left text-muted">
             <tr>
-              <th className="px-4 py-2 font-medium">Name</th>
+              <th className="px-4 py-2 font-medium">Employee</th>
+              <th className="px-4 py-2 font-medium">Phone</th>
               <th className="px-4 py-2 font-medium">Department</th>
-              <th className="px-4 py-2 font-medium">Job title</th>
+              <th className="px-4 py-2 font-medium">Job Title</th>
               <th className="px-4 py-2 font-medium">Role</th>
               <th className="px-4 py-2 font-medium">Status</th>
               <th className="px-4 py-2 font-medium">Actions</th>
@@ -208,8 +251,9 @@ export default function Employees() {
               <tr key={e.id}>
                 <td className="px-4 py-2">
                   <p className="font-medium text-ink-800">{e.full_name}</p>
-                  <p className="text-xs text-muted">{e.employee_code} · {e.email}</p>
+                  <p className="text-xs text-muted">ID: {e.employee_id || '—'} {e.email && !e.email.startsWith('emp_') ? `· ${e.email}` : ''}</p>
                 </td>
+                <td className="px-4 py-2 text-xs">{e.phone || '—'}</td>
                 <td className="px-4 py-2">{e.department?.name || '—'}</td>
                 <td className="px-4 py-2">{e.job_title?.title || '—'}</td>
                 <td className="px-4 py-2"><Badge>{e.role.replace('_', ' ')}</Badge></td>
