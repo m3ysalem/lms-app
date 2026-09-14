@@ -273,7 +273,10 @@ export async function issueCertificate(courseId) {
 // ---------- Admin: employees ----------
 export async function listEmployees({ search = '', departmentId = '' } = {}) {
   let query = supabase.from('profiles').select('*')
-  if (search) query = query.ilike('full_name', `%${search}%`)
+  if (search) {
+    // دعم البحث بالكود أو الاسم لضمان عدم حدوث خطأ عند تسجيل الدخول أو البحث
+    query = query.or(`full_name.ilike.%${search}%,employee_id.eq.${search}`)
+  }
   if (departmentId) query = query.eq('department_id', departmentId)
   const { data, error } = await query
   if (error) throw error
@@ -342,7 +345,7 @@ export async function addModule(courseId, title, sortOrder) {
 }
 
 export async function addLesson(moduleId, payload) {
-  const { data, error }  = await supabase
+  const { data, error } = await supabase
     .from('lessons')
     .insert({ module_id: moduleId, ...payload })
     .select()
