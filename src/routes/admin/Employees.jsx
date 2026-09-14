@@ -46,17 +46,13 @@ export default function Employees() {
         ? form.email.trim() 
         : `emp_${form.employee_id || Date.now()}@alesraa.com`
 
-      // تم تعديل ترتيب وتسمية الـ Arguments لتطابق الدالة الصحيحة في قاعدة البيانات وتتجنب خطأ 404
-      const { error: rpcError } = await supabase.rpc('admin_create_user', {
-        target_department_id: form.department_id || null,
-        target_email: finalEmail,
-        target_employee_id: form.employee_id || null,
-        target_full_name: form.full_name,
-        target_hire_date: form.hire_date || null,
-        target_job_title_id: form.job_title_id || null,
-        target_password: form.password || 'Password123!',
-        target_phone: form.phone || null,
-        target_role: form.role
+      // استدعاء دالة الـ RPC المحدثة لإنشاء المستخدم في الـ Auth و Profiles معاً
+      const { error: rpcError } = await supabase.rpc('admin_create_employee', {
+        p_email: finalEmail,
+        p_password: form.password || 'Password123!',
+        p_employee_id: form.employee_id || null,
+        p_full_name: form.full_name,
+        p_role: form.role
       })
 
       if (rpcError) throw rpcError
@@ -101,21 +97,15 @@ export default function Employees() {
             errors.push(`Skipped row — missing Name or Employee ID: ${JSON.stringify(row)}`)
             continue
           }
-          const dept = departments.find((d) => d.name.toLowerCase() === (row['Department'] || '').toLowerCase())
-          const jtitle = jobTitles.find((j) => j.title.toLowerCase() === (row['Job Title'] || '').toLowerCase())
           
           try {
             const rowEmail = row['Email']?.trim() || `emp_${row['Employee ID']}@alesraa.com`
-            const { error: rpcError } = await supabase.rpc('admin_create_user', {
-              target_department_id: dept?.id || null,
-              target_email: rowEmail,
-              target_employee_id: row['Employee ID'],
-              target_full_name: row['Name'],
-              target_hire_date: row['Hire Date'] || null,
-              target_job_title_id: jtitle?.id || null,
-              target_password: row['Password'] || 'Password123!',
-              target_phone: row['Phone'] || null,
-              target_role: row['Role'] || 'employee'
+            const { error: rpcError } = await supabase.rpc('admin_create_employee', {
+              p_email: rowEmail,
+              p_password: row['Password'] || 'Password123!',
+              p_employee_id: row['Employee ID'],
+              p_full_name: row['Name'],
+              p_role: row['Role'] || 'employee'
             })
             if (rpcError) throw rpcError
             success++
