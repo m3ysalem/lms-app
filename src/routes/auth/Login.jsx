@@ -23,22 +23,19 @@ export default function Login() {
     let loginIdentifier = rawInput
 
     try {
-      // لو المدخل مش إيميل (يعني كود موظف)، نبحث عن الإيميل المرتبط به في جدول profiles
+      // لو المدخل مش إيميل (يعني كود موظف)، نبحث عن الإيميل باستخدام دالة الـ RPC لتجاوز قيود الـ RLS واختلاف أنواع البيانات
       if (!rawInput.includes('@')) {
-        const { data: profileData, error: profileErr } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('employee_id', rawInput)
-          .maybeSingle()
+        const { data: emailData, error: rpcErr } = await supabase
+          .rpc('get_email_by_employee_id', { emp_id: rawInput })
 
-        console.log("Database Lookup Result:", { profileData, profileErr });
+        console.log("RPC Lookup Result:", { emailData, rpcErr });
 
-        if (profileErr || !profileData || !profileData.email) {
+        if (rpcErr || !emailData) {
           setBusy(false)
-          setError('كود الموظف غير مسجل أو غير صحيح في جدول profiles.')
+          setError('كود الموظف غير مسجل أو غير صحيح في النظام.')
           return
         }
-        loginIdentifier = profileData.email.trim()
+        loginIdentifier = emailData.trim()
       }
 
       console.log("Attempting sign in with email:", loginIdentifier);
