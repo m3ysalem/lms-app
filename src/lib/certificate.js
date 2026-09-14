@@ -38,12 +38,12 @@ export async function downloadCertificatePdf(cert) {
   const font = await doc.embedFont(StandardFonts.HelveticaBold)
   const bodyFont = await doc.embedFont(StandardFonts.Helvetica)
 
-  // الألوان (تأكد إنها متناسقة مع تصميمك أو عدلها حسب الألوان)
+  // الألوان
   const navy = rgb(0x1b / 255, 0x2a / 255, 0x4a / 255)
   const teal = rgb(0x0f / 255, 0x7a / 255, 0x6b / 255)
   const gray = rgb(0x66 / 255, 0x70 / 255, 0x85 / 255)
 
-  // 4. كتابة البيانات المتغيرة فوق التصميم (الإحداثيات Y و X ممكن تعدلها لو محتاج تضبط مكانها بدقة على صورتك)
+  // 4. كتابة البيانات المتغيرة فوق التصميم (تم تجنب أي نصوص عربية منعاً لأخطاء التشفير)
   
   // اسم الموظف
   if (cert.employee_name) {
