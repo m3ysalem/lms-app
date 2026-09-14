@@ -46,13 +46,17 @@ export default function Employees() {
         ? form.email.trim() 
         : `emp_${form.employee_id || Date.now()}@alesraa.com`
 
-      // استدعاء دالة الـ RPC المحدثة لإنشاء المستخدم في الـ Auth و Profiles معاً
+      // استدعاء الدالة المحدثة مع تمرير كافة البيانات بالتفصيل
       const { error: rpcError } = await supabase.rpc('admin_create_employee', {
         p_email: finalEmail,
         p_password: form.password || 'Password123!',
         p_employee_id: form.employee_id || null,
         p_full_name: form.full_name,
-        p_role: form.role
+        p_role: form.role,
+        p_phone: form.phone || null,
+        p_department_id: form.department_id || null,
+        p_job_title_id: form.job_title_id || null,
+        p_hire_date: form.hire_date || null
       })
 
       if (rpcError) throw rpcError
@@ -73,8 +77,8 @@ export default function Employees() {
   }
 
   const resetPassword = async (emp) => {
-    if (!emp.email || emp.email.includes('@alesraa.com') && emp.email.startsWith('emp_')) {
-      alert('This user does not have a real email registered. You can update their password directly from Supabase if needed.')
+    if (!emp.email || (emp.email.includes('@alesraa.com') && emp.email.startsWith('emp_'))) {
+      alert('This user does not have a real external email registered.')
       return
     }
     const { error } = await supabase.auth.resetPasswordForEmail(emp.email)
@@ -105,7 +109,11 @@ export default function Employees() {
               p_password: row['Password'] || 'Password123!',
               p_employee_id: row['Employee ID'],
               p_full_name: row['Name'],
-              p_role: row['Role'] || 'employee'
+              p_role: row['Role'] || 'employee',
+              p_phone: row['Phone'] || null,
+              p_department_id: null,
+              p_job_title_id: null,
+              p_hire_date: row['Hire Date'] || null
             })
             if (rpcError) throw rpcError
             success++
@@ -148,7 +156,6 @@ export default function Employees() {
               {importResult.errors.map((e, i) => <li key={i}>{e}</li>)}
             </ul>
           )}
-          <p className="text-muted mt-2">Expected columns: Employee ID, Name, Phone, Email, Department, Job Title, Hire Date, Role, Password</p>
         </div>
       )}
 
@@ -160,7 +167,7 @@ export default function Employees() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Employee ID / كود الموظف *</label>
-              <input className="input" required placeholder="e.g. 1003" value={form.employee_id} onChange={(e) => setForm({ ...form, employee_id: e.target.value })} />
+              <input className="input" required placeholder="e.g. 1005" value={form.employee_id} onChange={(e) => setForm({ ...form, employee_id: e.target.value })} />
             </div>
             <div>
               <label className="label">Full Name / الاسم الكامل *</label>
