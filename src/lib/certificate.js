@@ -25,7 +25,7 @@ export async function downloadCertificatePdf(cert) {
   const bodyFont = await doc.embedFont(StandardFonts.Helvetica)
 
   // الألوان (الأحمر المتناسق مع اللوجو ودرجات الألوان الرسمية)
-  const brandRed = rgb(0x8b / 255, 0x1e / 255, 0x24 / 255) // لون أحمر متناسق مع اللوجو
+  const brandRed = rgb(0x8b / 255, 0x1e / 255, 0x24 / 255)
   const navy = rgb(0x1b / 255, 0x2a / 255, 0x4a / 255)
   const gray = rgb(0x66 / 255, 0x70 / 255, 0x85 / 255)
 
@@ -38,7 +38,7 @@ export async function downloadCertificatePdf(cert) {
     }
   }
 
-  // 1. اسم الموظف (تم تنزيله مكان الخط المنقط الأول Y = 320، ولونه أحمر فخم)
+  // 1. اسم الموظف
   if (cert.employee_name) {
     const nameSize = 28
     const textWidth = font.widthOfTextAtSize(cert.employee_name, nameSize)
@@ -51,16 +51,15 @@ export async function downloadCertificatePdf(cert) {
     })
   }
 
-  // 2. اسم الكورس مع كلمة Course (تم تنزيله مكان الخط المنقط الثاني Y = 230)
+  // 2. اسم الكورس (تمت إزالة شرط اللغة العربية ليظهر اسم الكورس الحقيقي مثل HSE3 مباشرة بدون إبداله بكلمة Course Completion)
   if (cert.course_name) {
     const courseSize = 22
     let courseRaw = cert.course_name
-    if (/[\u0600-\u06FF]/.test(courseRaw)) {
-      courseRaw = "Course Completion"
-    }
-    // إضافة كلمة Course بجانب اسم الكورس
-    const courseText = `${courseRaw} Course`
+    
+    // عرض اسم الكورس الحقيقي مباشرة
+    const courseText = courseRaw.toLowerCase().includes('course') ? courseRaw : `${courseRaw} Course`
     const textWidth = font.widthOfTextAtSize(courseText, courseSize)
+    
     safeDrawText(courseText, {
       x: 421 - textWidth / 2,
       y: 230,
