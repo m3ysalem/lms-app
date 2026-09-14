@@ -46,7 +46,7 @@ export async function getMyCertificates(employeeId) {
   try {
     const { data, error } = await supabase
       .from('certificates')
-      .select('*, course:course_id(*)')
+      .select('*, course:courses(name)')
       .eq('employee_id', employeeId)
 
     if (error) {
@@ -342,7 +342,7 @@ export async function addModule(courseId, title, sortOrder) {
 }
 
 export async function addLesson(moduleId, payload) {
-  const { data, error } = await supabase
+  const { data, error }  = await supabase
     .from('lessons')
     .insert({ module_id: moduleId, ...payload })
     .select()
