@@ -52,44 +52,20 @@ export default function Employees() {
 
       const finalPassword = form.password || 'Password123!'
 
-      // 1. إنشاء حساب المصادقة رسمياً في Supabase Auth لتوليد الـ ID السليم وبنية الـ Schema الكاملة
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: finalEmail,
-        password: finalPassword,
-        options: {
-          data: {
-            employee_id: form.employee_id.trim(),
-            full_name: form.full_name
-          }
-        }
+      // استدعاء دالة الأدمن في قاعدة البيانات (تنشئ الحساب بالخلفية دون إخراج الأدمن الحالي)
+      const { error: rpcError } = await supabase.rpc('admin_create_employee', {
+        p_email: finalEmail,
+        p_password: finalPassword,
+        p_employee_id: form.employee_id.trim(),
+        p_full_name: form.full_name,
+        p_role: form.role,
+        p_phone: form.phone || null,
+        p_department_id: form.department_id || null,
+        p_job_title_id: form.job_title_id || null,
+        p_hire_date: form.hire_date || null
       })
 
-      if (authError) throw authError
-
-      const userId = authData.user?.id
-      if (!userId) {
-        throw new Error('Failed to create authentication user ID.')
-      }
-
-      // 2. إدخال البروفايل في جدول public.profiles باستخدام نفس الـ ID المولد
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([
-          {
-            id: userId,
-            employee_id: form.employee_id.trim(),
-            full_name: form.full_name,
-            phone: form.phone || null,
-            email: finalEmail,
-            role: form.role,
-            department_id: form.department_id || null,
-            job_title_id: form.job_title_id || null,
-            hire_date: form.hire_date || null,
-            is_active: true
-          }
-        ])
-
-      if (profileError) throw profileError
+      if (rpcError) throw rpcError
 
       setSaving(false)
       setShowForm(false)
@@ -137,40 +113,19 @@ export default function Employees() {
             const rowEmail = row['Email']?.trim() || `emp_${empId}@alesraa.com`
             const rowPassword = row['Password'] || 'Password123!'
 
-            const { data: authData, error: authError } = await supabase.auth.signUp({
-              email: rowEmail,
-              password: rowPassword,
-              options: {
-                data: {
-                  employee_id: empId,
-                  full_name: row['Name']
-                }
-              }
+            const { error: rpcError } = await supabase.rpc('admin_create_employee', {
+              p_email: rowEmail,
+              p_password: rowPassword,
+              p_employee_id: empId,
+              p_full_name: row['Name'],
+              p_role: row['Role'] || 'employee',
+              p_phone: row['Phone'] || null,
+              p_department_id: null,
+              p_job_title_id: null,
+              p_hire_date: row['Hire Date'] || null
             })
 
-            if (authError) throw authError
-
-            const userId = authData.user?.id
-            if (!userId) throw new Error('Auth ID missing')
-
-            const { error: profileError } = await supabase
-              .from('profiles')
-              .insert([
-                {
-                  id: userId,
-                  employee_id: empId,
-                  full_name: row['Name'],
-                  phone: row['Phone'] || null,
-                  email: rowEmail,
-                  role: row['Role'] || 'employee',
-                  department_id: null,
-                  job_title_id: null,
-                  hire_date: row['Hire Date'] || null,
-                  is_active: true
-                }
-              ])
-
-            if (profileError) throw profileError
+            if (rpcError) throw rpcError
 
             success++
           } catch (err) {
