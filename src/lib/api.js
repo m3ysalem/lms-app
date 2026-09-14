@@ -274,7 +274,6 @@ export async function issueCertificate(courseId) {
 export async function listEmployees({ search = '', departmentId = '' } = {}) {
   let query = supabase.from('profiles').select('*')
   if (search) {
-    // تم تصحيح طريقة البحث لتجنب انهيار الاستعلام عند البحث بالكود
     query = query.or(`full_name.ilike.%${search}%,employee_id.eq.${search}`)
   }
   if (departmentId) query = query.eq('department_id', departmentId)
@@ -350,9 +349,6 @@ export async function addLesson(moduleId, payload) {
     .insert({ module_id: moduleId, ...payload })
     .select()
     .single()
-  if, error {
-    // تم إصلاح الخطأ النحوي هنا
-  }
   if (error) {
     console.error('addLesson error details:', error)
     alert('Failed to add lesson: ' + error.message)
