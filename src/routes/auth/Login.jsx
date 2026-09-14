@@ -23,9 +23,18 @@ export default function Login() {
     let loginIdentifier = rawInput
 
     try {
-      // إذا لم يكن المدخل إيميل (أي كود موظف مثل 1003)، يتم تحويله تلقائياً للإيميل الافتراضي أو جلبه
+      // إذا كان المدخل لا يحتوي على @، فهذا معناه أنه كود موظف (مثل 1002 أو 1003)
       if (!rawInput.includes('@')) {
-        loginIdentifier = `emp_${rawInput}@alesraa.com`
+        // نبحث عن الإيميل الفعلي المرتبط بكود الموظف من قاعدة البيانات
+        const { data: emailData, error: rpcErr } = await supabase
+          .rpc('get_email_by_employee_id', { emp_id: rawInput })
+
+        if (rpcErr || !emailData) {
+          // إذا لم يجد الكود في قاعدة البيانات، نجرب التوليد الافتراضي كخيار بديل
+          loginIdentifier = `emp_${rawInput}@alesraa.com`
+        } else {
+          loginIdentifier = emailData.trim()
+        }
       }
 
       const { error: signErr } = await signIn(loginIdentifier, password)
@@ -74,7 +83,7 @@ export default function Login() {
               type="text"
               required
               className="w-full px-4 py-3.5 rounded-xl bg-[#0d0f12]/80 border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-[#9E1B1B] focus:ring-1 focus:ring-[#9E1B1B] transition-all text-sm"
-              placeholder="e.g. 1003 or admin@alesraa.net"
+              placeholder="e.g. 1002 or admin@alesraa.net"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
