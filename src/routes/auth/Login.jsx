@@ -23,19 +23,21 @@ export default function Login() {
     let loginIdentifier = rawInput
 
     try {
-      // إذا لم يكتب المستخدم علامة @ (أي أنه أدخل كود موظف مثل 1003)
+      // إذا لم يكتب المستخدم علامة @، نبحث بكود الموظف أو الاسم أو البريد الجزئي بأمان تام
       if (!rawInput.includes('@')) {
-        // نبحث مباشرة في جدول profiles عن الإيميل المرتبط بكود الموظف
         const { data: profileData, error: profileErr } = await supabase
           .from('profiles')
           .select('email')
-          .or(`employee_id.eq.${rawInput},email.ilike.%${rawInput}%`)
+          .eq('employee_id', rawInput)
           .maybeSingle()
+
+        if (profileErr) {
+          console.error('Profile lookup error:', profileErr)
+        }
 
         if (profileData && profileData.email) {
           loginIdentifier = profileData.email.trim()
         } else {
-          // إذا لم يجد سجلاً في البروفايل، نجرب الصيغة الافتراضية
           loginIdentifier = `emp_${rawInput}@alesraa.com`
         }
       }
@@ -118,7 +120,7 @@ export default function Login() {
             <div className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">{error}</div>
           )}
 
-          <button type="submit" disabled={busy} className="w-full py-4 rounded-xl bg-gradient-to-r from-[#9E1B1B] to-rose-700 hover:from-rose-700 hover:to-[#9E1B1B] text-white font-bold text-sm tracking-wide shadow-lg shadow-red-950/50 transition-all duration-300 disabled:opacity-50 mt-2">
+          <button type="submit" disabled={busy} className="w-0.5 w-full py-4 rounded-xl bg-gradient-to-r from-[#9E1B1B] to-rose-700 hover:from-rose-700 hover:to-[#9E1B1B] text-white font-bold text-sm tracking-wide shadow-lg shadow-red-950/50 transition-all duration-300 disabled:opacity-50 mt-2" style={{ width: '100%' }}>
             {busy ? 'Signing in…' : 'Sign in to Dashboard'}
           </button>
         </form>
