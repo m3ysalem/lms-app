@@ -23,22 +23,35 @@ export default function Login() {
     let loginIdentifier = rawInput
 
     try {
-      // لو المدخل مش إيميل (يعني كود موظف)، نبحث عن الإيميل باستخدام دالة الـ RPC لتجاوز قيود الـ RLS واختلاف أنواع البيانات
       if (!rawInput.includes('@')) {
-        const { data: emailData, error: rpcErr } = await supabase
-          .rpc('get_email_by_employee_id', { emp_id: rawInput })
+        // محاولة البحث المباشر في الجدول أولاً كبديل أو التأكد من دالة الـ RPC
+        const { data: profileData, error: profileErr } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('employee_id', rawInput)
+          .maybeSingle()
 
-        console.log("RPC Lookup Result:", { emailData, rpcErr });
+        console.log("Direct Profile Lookup:", { profileData, profileErr });
 
-        if (rpcErr || !emailData) {
-          setBusy(false)
-          setError('كود الموظف غير مسجل أو غير صحيح في النظام.')
-          return
+        if (profileData && profileData.email) {
+          loginIdentifier = profileData.email.trim()
+        } else {
+          // لو فشل البحث المباشر، جرب الـ RPC
+          const { data: emailData, error: rpcErr } = await supabase
+            .rpc('get_email_by_employee_id', { emp_id: rawInput })
+
+          console.log("RPC Lookup Result:", { emailData, rpcErr });
+
+          if (rpcErr || !emailData) {
+            setBusy(false)
+            setError('كود الموظف غير مسجل أو غير صحيح في النظام.')
+            return
+          }
+          loginIdentifier = emailData.trim()
         }
-        loginIdentifier = emailData.trim()
       }
 
-      console.log("Attempting sign in with email:", loginIdentifier);
+      console.log("Final Login Identifier sent to Supabase:", loginIdentifier);
 
       const { error: signErr } = await signIn(loginIdentifier, password)
       setBusy(false)
@@ -60,36 +73,17 @@ export default function Login() {
 
   return (
     <div className="min-h-screen relative flex items-center justify-center bg-[#0d0f12] overflow-hidden bg-cover bg-center" style={{ backgroundImage: `url('/company-bg.jpg')` }}>
-      
-      {/* Modern Deep Overlay with Blur */}
       <div className="absolute inset-0 bg-[#0d0f12]/80 backdrop-blur-md" />
-
-      {/* Decorative Glow Elements */}
       <div className="absolute -top-32 -left-32 w-96 h-96 bg-[#9E1B1B]/20 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-rose-950/30 rounded-full blur-[140px] pointer-events-none" />
 
-      {/* Center Floating Glass Card */}
       <div className="relative z-10 w-full max-w-lg mx-4 p-8 sm:p-12 rounded-[2.5rem] bg-[#14181d]/90 border border-white/10 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl text-white">
-        
-        {/* Brand Header & Title centered */}
         <div className="text-center flex flex-col items-center mb-8">
-          <div 
-            className="px-6 py-3.5 rounded-2xl shadow-2xl border border-white mb-4 flex items-center justify-center"
-            style={{ backgroundColor: '#ffffff', opacity: 1 }}
-          >
-            <img 
-              src="/logo.png" 
-              alt="ALESRAA PHARMACEUTICALS" 
-              className="h-10 w-auto object-contain"
-              onError={(e) => { e.target.style.display = 'none' }}
-            />
+          <div className="px-6 py-3.5 rounded-2xl shadow-2xl border border-white mb-4 flex items-center justify-center" style={{ backgroundColor: '#ffffff', opacity: 1 }}>
+            <img src="/logo.png" alt="ALESRAA PHARMACEUTICALS" className="h-10 w-auto object-contain" onError={(e) => { e.target.style.display = 'none' }} />
           </div>
-          <span className="font-head font-black text-xl tracking-wider text-white block mb-1">
-            ALESRAA PHARMACEUTICALS
-          </span>
-          <span className="text-xs text-rose-400 font-semibold tracking-[0.25em] uppercase">
-            Optima Learning Management System
-          </span>
+          <span className="font-head font-black text-xl tracking-wider text-white block mb-1">ALESRAA PHARMACEUTICALS</span>
+          <span className="text-xs text-rose-400 font-semibold tracking-[0.25em] uppercase">Optima Learning Management System</span>
         </div>
 
         <div className="mb-6 text-center">
@@ -99,9 +93,7 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold tracking-wider text-gray-300 uppercase mb-1.5" htmlFor="email">
-              Employee ID or Email
-            </label>
+            <label className="block text-xs font-semibold tracking-wider text-gray-300 uppercase mb-1.5" htmlFor="email">Employee ID or Email</label>
             <input
               id="email"
               type="text"
@@ -114,9 +106,7 @@ export default function Login() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold tracking-wider text-gray-300 uppercase mb-1.5" htmlFor="password">
-              Password
-            </label>
+            <label className="block text-xs font-semibold tracking-wider text-gray-300 uppercase mb-1.5" htmlFor="password">Password</label>
             <input
               id="password"
               type="password"
@@ -130,34 +120,17 @@ export default function Login() {
 
           <div className="flex items-center justify-between text-xs pt-1">
             <label className="flex items-center gap-2 text-gray-400 cursor-pointer">
-              <input 
-                type="checkbox" 
-                checked={remember} 
-                onChange={(e) => setRemember(e.target.checked)}
-                className="rounded border-white/10 bg-[#0d0f12] text-[#9E1B1B] focus:ring-0"
-              />
+              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="rounded border-white/10 bg-[#0d0f12] text-[#9E1B1B] focus:ring-0" />
               Remember me
             </label>
-            <a 
-              href="#" 
-              className="text-rose-500 hover:text-rose-400 font-medium transition-colors" 
-              onClick={(e) => { e.preventDefault(); alert('Ask your HR/L&D admin to reset your password from the Employees page.') }}
-            >
-              Forgot password?
-            </a>
+            <a href="#" className="text-rose-500 hover:text-rose-400 font-medium transition-colors" onClick={(e) => { e.preventDefault(); alert('Ask your HR/L&D admin to reset your password from the Employees page.') }}>Forgot password?</a>
           </div>
 
           {error && (
-            <div className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">
-              {error}
-            </div>
+            <div className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">{error}</div>
           )}
 
-          <button 
-            type="submit" 
-            disabled={busy} 
-            className="w-full py-4 rounded-xl bg-gradient-to-r from-[#9E1B1B] to-rose-700 hover:from-rose-700 hover:to-[#9E1B1B] text-white font-bold text-sm tracking-wide shadow-lg shadow-red-950/50 transition-all duration-300 disabled:opacity-50 mt-2"
-          >
+          <button type="submit" disabled={busy} className="w-full py-4 rounded-xl bg-gradient-to-r from-[#9E1B1B] to-rose-700 hover:from-rose-700 hover:to-[#9E1B1B] text-white font-bold text-sm tracking-wide shadow-lg shadow-red-950/50 transition-all duration-300 disabled:opacity-50 mt-2">
             {busy ? 'Signing in…' : 'Sign in to Dashboard'}
           </button>
         </form>
