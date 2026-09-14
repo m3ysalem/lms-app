@@ -23,35 +23,22 @@ export default function Login() {
     let loginIdentifier = rawInput
 
     try {
+      // لو المدخل مش إيميل (يعني كود موظف)، نجلب الإيميل المرتبط به عن طريق الـ RPC
       if (!rawInput.includes('@')) {
-        // محاولة البحث المباشر في الجدول أولاً كبديل أو التأكد من دالة الـ RPC
-        const { data: profileData, error: profileErr } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('employee_id', rawInput)
-          .maybeSingle()
+        const { data: emailData, error: rpcErr } = await supabase
+          .rpc('get_email_by_employee_id', { emp_id: rawInput })
 
-        console.log("Direct Profile Lookup:", { profileData, profileErr });
+        console.log("RPC Lookup Result:", { emailData, rpcErr });
 
-        if (profileData && profileData.email) {
-          loginIdentifier = profileData.email.trim()
-        } else {
-          // لو فشل البحث المباشر، جرب الـ RPC
-          const { data: emailData, error: rpcErr } = await supabase
-            .rpc('get_email_by_employee_id', { emp_id: rawInput })
-
-          console.log("RPC Lookup Result:", { emailData, rpcErr });
-
-          if (rpcErr || !emailData) {
-            setBusy(false)
-            setError('كود الموظف غير مسجل أو غير صحيح في النظام.')
-            return
-          }
-          loginIdentifier = emailData.trim()
+        if (rpcErr || !emailData) {
+          setBusy(false)
+          setError('كود الموظف غير مسجل أو غير صحيح في النظام.')
+          return
         }
+        loginIdentifier = emailData.trim()
       }
 
-      console.log("Final Login Identifier sent to Supabase:", loginIdentifier);
+      console.log("Final Login Identifier sent to Supabase Auth:", loginIdentifier);
 
       const { error: signErr } = await signIn(loginIdentifier, password)
       setBusy(false)
@@ -99,7 +86,7 @@ export default function Login() {
               type="text"
               required
               className="w-full px-4 py-3.5 rounded-xl bg-[#0d0f12]/80 border border-white/10 text-white placeholder-gray-600 focus:outline-none focus:border-[#9E1B1B] focus:ring-1 focus:ring-[#9E1B1B] transition-all text-sm"
-              placeholder="e.g. 1001 or admin@alesraa.com"
+              placeholder="e.g. 1004 or admin@alesraa.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
