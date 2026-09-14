@@ -42,30 +42,54 @@ export default function Employees() {
     setError('')
 
     try {
-      // التأكد من وجود كود للموظف وعدم تركه فارغاً
       if (!form.employee_id || !form.employee_id.trim()) {
         throw new Error('Employee ID is required / كود الموظف إلزامي لتسجيل الدخول')
       }
 
-      // توليد بريد إلكتروني رسمي وثابت يعتمد على كود الموظف حصرياً لكي يسهل تسجيل الدخول به
       const finalEmail = form.email && form.email.trim() !== '' 
         ? form.email.trim() 
         : `emp_${form.employee_id.trim()}@alesraa.com`
 
-      // استدعاء الدالة الآمنة في قاعدة البيانات
-      const { error: rpcError } = await supabase.rpc('admin_create_employee', {
-        p_email: finalEmail,
-        p_password: form.password || 'Password123!',
-        p_employee_id: form.employee_id.trim(),
-        p_full_name: form.full_name,
-        p_role: form.role,
-        p_phone: form.phone || null,
-        p_department_id: form.department_id || null,
-        p_job_title_id: form.job_title_id || null,
-        p_hire_date: form.hire_date || null
+      const finalPassword = form.password || 'Password123!'
+
+      // 1. إنشاء حساب المصادقة رسمياً في Supabase Auth لتوليد الـ ID السليم وبنية الـ Schema الكاملة
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: finalEmail,
+        password: finalPassword,
+        options: {
+          data: {
+            employee_id: form.employee_id.trim(),
+            full_name: form.full_name
+          }
+        }
       })
 
-      if (rpcError) throw rpcError
+      if (authError) throw authError
+
+      const userId = authData.user?.id
+      if (!userId) {
+        throw new Error('Failed to create authentication user ID.')
+      }
+
+      // 2. إدخال البروفايل في جدول public.profiles باستخدام نفس الـ ID المولد
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert([
+          {
+            id: userId,
+            employee_id: form.employee_id.trim(),
+            full_name: form.full_name,
+            phone: form.phone || null,
+            email: finalEmail,
+            role: form.role,
+            department_id: form.department_id || null,
+            job_title_id: form.job_title_id || null,
+            hire_date: form.hire_date || null,
+            is_active: true
+          }
+        ])
+
+      if (profileError) throw profileError
 
       setSaving(false)
       setShowForm(false)
@@ -111,19 +135,43 @@ export default function Employees() {
           try {
             const empId = row['Employee ID'].toString().trim()
             const rowEmail = row['Email']?.trim() || `emp_${empId}@alesraa.com`
-            
-            const { error: rpcError } = await supabase.rpc('admin_create_employee', {
-              p_email: rowEmail,
-              p_password: row['Password'] || 'Password123!',
-              p_employee_id: empId,
-              p_full_name: row['Name'],
-              p_role: row['Role'] || 'employee',
-              p_phone: row['Phone'] || null,
-              p_department_id: null,
-              p_job_title_id: null,
-              p_hire_date: row['Hire Date'] || null
+            const rowPassword = row['Password'] || 'Password123!'
+
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+              email: rowEmail,
+              password: rowPassword,
+              options: {
+                data: {
+                  employee_id: empId,
+                  full_name: row['Name']
+                }
+              }
             })
-            if (rpcError) throw rpcError
+
+            if (authError) throw authError
+
+            const userId = authData.user?.id
+            if (!userId) throw new Error('Auth ID missing')
+
+            const { error: profileError } = await supabase
+              .from('profiles')
+              .insert([
+                {
+                  id: userId,
+                  employee_id: empId,
+                  full_name: row['Name'],
+                  phone: row['Phone'] || null,
+                  email: rowEmail,
+                  role: row['Role'] || 'employee',
+                  department_id: null,
+                  job_title_id: null,
+                  hire_date: row['Hire Date'] || null,
+                  is_active: true
+                }
+              ])
+
+            if (profileError) throw profileError
+
             success++
           } catch (err) {
             errors.push(`${row['Employee ID']}: ${err.message}`)
