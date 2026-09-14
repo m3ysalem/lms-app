@@ -42,15 +42,21 @@ export default function Employees() {
     setError('')
 
     try {
-      const finalEmail = form.email.trim() !== '' 
-        ? form.email.trim() 
-        : `emp_${form.employee_id || Date.now()}@alesraa.com`
+      // التأكد من وجود كود للموظف وعدم تركه فارغاً
+      if (!form.employee_id || !form.employee_id.trim()) {
+        throw new Error('Employee ID is required / كود الموظف إلزامي لتسجيل الدخول')
+      }
 
-      // استدعاء الدالة المحدثة مع تمرير كافة البيانات بالتفصيل
+      // توليد بريد إلكتروني رسمي وثابت يعتمد على كود الموظف حصرياً لكي يسهل تسجيل الدخول به
+      const finalEmail = form.email && form.email.trim() !== '' 
+        ? form.email.trim() 
+        : `emp_${form.employee_id.trim()}@alesraa.com`
+
+      // استدعاء الدالة الآمنة في قاعدة البيانات
       const { error: rpcError } = await supabase.rpc('admin_create_employee', {
         p_email: finalEmail,
         p_password: form.password || 'Password123!',
-        p_employee_id: form.employee_id || null,
+        p_employee_id: form.employee_id.trim(),
         p_full_name: form.full_name,
         p_role: form.role,
         p_phone: form.phone || null,
@@ -103,11 +109,13 @@ export default function Employees() {
           }
           
           try {
-            const rowEmail = row['Email']?.trim() || `emp_${row['Employee ID']}@alesraa.com`
+            const empId = row['Employee ID'].toString().trim()
+            const rowEmail = row['Email']?.trim() || `emp_${empId}@alesraa.com`
+            
             const { error: rpcError } = await supabase.rpc('admin_create_employee', {
               p_email: rowEmail,
               p_password: row['Password'] || 'Password123!',
-              p_employee_id: row['Employee ID'],
+              p_employee_id: empId,
               p_full_name: row['Name'],
               p_role: row['Role'] || 'employee',
               p_phone: row['Phone'] || null,
