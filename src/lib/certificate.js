@@ -2,7 +2,7 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 
 export async function downloadCertificatePdf(cert) {
   const doc = await PDFDocument.create()
-  const page = doc.addPage([842, 595])
+  const page = doc.addPage([842, 595]) // A4 Landscape
 
   try {
     const imageBytes = await fetch('/certificate-template.png').then((res) => {
@@ -20,58 +20,67 @@ export async function downloadCertificatePdf(cert) {
     console.warn('Template load failed:', err)
   }
 
-  const font = await doc.embedFont(StandardFonts.HelveticaBold)
+  // استخدام فونت فاخر ومودرن (TimesRomanBold) للاسم والكورس
+  const font = await doc.embedFont(StandardFonts.TimesRomanBold)
   const bodyFont = await doc.embedFont(StandardFonts.Helvetica)
 
+  // الألوان (الأحمر المتناسق مع اللوجو ودرجات الألوان الرسمية)
+  const brandRed = rgb(0x8b / 255, 0x1e / 255, 0x24 / 255) // لون أحمر متناسق مع اللوجو
   const navy = rgb(0x1b / 255, 0x2a / 255, 0x4a / 255)
-  const teal = rgb(0x0f / 255, 0x7a / 255, 0x6b / 255)
   const gray = rgb(0x66 / 255, 0x70 / 255, 0x85 / 255)
 
-  // دالة أمان لمنع أي خطأ لو النص فيه عربي
   const safeDrawText = (text, options) => {
     try {
       if (!text) return
-      // لو حابب تتأكد، لو النص فيه عربي ممكن تطبع نص بديل أو تتخطاه
       page.drawText(String(text), options)
     } catch (e) {
       console.warn('Skipped text due to encoding error:', text, e)
     }
   }
 
+  // 1. اسم الموظف (تم تنزيله مكان الخط المنقط الأول Y = 320، ولونه أحمر فخم)
   if (cert.employee_name) {
-    const nameSize = 26
+    const nameSize = 28
     const textWidth = font.widthOfTextAtSize(cert.employee_name, nameSize)
     safeDrawText(cert.employee_name, {
       x: 421 - textWidth / 2,
-      y: 345,
+      y: 320, 
       size: nameSize,
       font,
-      color: teal,
+      color: brandRed,
     })
   }
 
+  // 2. اسم الكورس مع كلمة Course (تم تنزيله مكان الخط المنقط الثاني Y = 230)
   if (cert.course_name) {
-    const courseSize = 20
-    // لو اسم الكورس عربي، هنحوله لإنجليزي مؤقتاً أو نتخطاه عشان الـ PDF ما يضربش
-    const courseText = /[\u0600-\u06FF]/.test(cert.course_name) ? "Course Completion Certificate" : cert.course_name
+    const courseSize = 22
+    let courseRaw = cert.course_name
+    if (/[\u0600-\u06FF]/.test(courseRaw)) {
+      courseRaw = "Course Completion"
+    }
+    // إضافة كلمة Course بجانب اسم الكورس
+    const courseText = `${courseRaw} Course`
     const textWidth = font.widthOfTextAtSize(courseText, courseSize)
     safeDrawText(courseText, {
       x: 421 - textWidth / 2,
-      y: 285,
+      y: 230,
       size: courseSize,
       font,
       color: navy,
     })
   }
 
+  // اسم المدرب (إن وجد)
   if (cert.trainer_name && !/[\u0600-\u06FF]/.test(cert.trainer_name)) {
     safeDrawText(cert.trainer_name, { x: 100, y: 112, size: 10, font: bodyFont, color: gray })
   }
 
+  // تاريخ الإصدار
   if (cert.issued_date) {
     safeDrawText(cert.issued_date, { x: 542, y: 112, size: 10, font: bodyFont, color: gray })
   }
 
+  // رقم الشهادة
   if (cert.cert_number) {
     safeDrawText(`ID: ${cert.cert_number}`, { x: 60, y: 50, size: 9, font: bodyFont, color: gray })
   }
