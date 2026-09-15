@@ -13,11 +13,13 @@ export function AuthProvider({ children }) {
       setProfile(null)
       return
     }
+    // استبدلنا .single() بـ .maybeSingle() عشان تمنع الإيرور لو البروفايل لسه مش موجود
     const { data, error } = await supabase
       .from('profiles')
       .select('*, department:department_id(id,name), job_title:job_title_id(id,title)')
       .eq('id', userId)
-      .single()
+      .maybeSingle()
+
     if (error) {
       console.error('Failed to load profile', error)
       setProfile(null)
