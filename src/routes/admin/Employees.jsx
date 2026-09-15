@@ -117,6 +117,28 @@ export default function Employees() {
     refresh()
   }
 
+  // الدالة الجديدة المضافة بحذر لشحن زرار الحذف
+  const deleteEmployee = async (emp) => {
+    if (!window.confirm(`Are you sure you want to delete employee: ${emp.full_name}?`)) {
+      return
+    }
+
+    try {
+      // حذف السجل من جدول profiles بناءً على الـ id
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', emp.id)
+
+      if (error) throw error
+
+      // تحديث القائمة بعد الحذف بنجاح
+      refresh()
+    } catch (err) {
+      alert('Failed to delete employee: ' + err.message)
+    }
+  }
+
   const resetPassword = async (emp) => {
     if (!emp.email || (emp.email.includes('@alesraa.com') && emp.email.startsWith('emp_'))) {
       alert('This user does not have a real external email registered.')
@@ -332,7 +354,7 @@ export default function Employees() {
                 </td>
                 <td className="px-4 py-2 text-xs">{e.phone || '—'}</td>
                 <td className="px-4 py-2">{e.department?.name || '—'}</td>
-                <td className="px-4 py-2">{e.job_title?.title || '—'}</td>
+                <td className="px-4 py-2">{e.job_title?.title || 'Name'}</td>
                 <td className="px-4 py-2"><Badge>{e.role.replace('_', ' ')}</Badge></td>
                 <td className="px-4 py-2">
                   <Badge tone={e.is_active ? 'success' : 'danger'}>{e.is_active ? 'Active' : 'Inactive'}</Badge>
@@ -341,6 +363,10 @@ export default function Employees() {
                   <button className="text-teal text-xs hover:underline" onClick={() => resetPassword(e)}>Reset password</button>
                   <button className="text-danger text-xs hover:underline" onClick={() => toggleActive(e)}>
                     {e.is_active ? 'Deactivate' : 'Reactivate'}
+                  </button>
+                  {/* زرار الحذف الجديد */}
+                  <button className="text-red-600 text-xs hover:underline font-semibold" onClick={() => deleteEmployee(e)}>
+                    Delete
                   </button>
                 </td>
               </tr>
