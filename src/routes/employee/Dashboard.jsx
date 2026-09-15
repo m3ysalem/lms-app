@@ -6,31 +6,66 @@ import { Badge, statusTone, ProgressBar, Spinner, KpiCard, EmptyState } from '..
 
 export default function Dashboard() {
   const { profile } = useAuth()
-  const [assignments, setAssignments] = useState(null)
+  const [assignments, setAssignments] = useState([])
   const [progressMap, setProgressMap] = useState({})
   const [certificates, setCertificates] = useState([])
   const [notifications, setNotifications] = useState([])
-  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!profile?.id) return
-    Promise.all([
-      getMyAssignments(profile.id).catch(() => []),
-      getMyProgressMap(profile.id).catch(() => ({})),
-      getMyCertificates(profile.id).catch(() => []),
-      getMyNotifications(profile.id).catch(() => []),
-    ])
-      .then(([a, p, c, n]) => {
-        setAssignments(a || [])
-        setProgressMap(p || {})
-        setCertificates(c || [])
-        setNotifications(n || [])
-      })
-      .catch((e) => setError(e.message))
+    let isMounted = true
+
+    async function loadData() {
+      if (!profile?.id) {
+        if (isMounted) setLoading(false)
+        return
+      }
+
+      try {
+        const [a, p, c, n] = await Promise.all([
+          getMyAssignments(profile.id).catch(() => []),
+          getMyProgressMap(profile.id).catch(() => ({})),
+          getMyCertificates(profile.id).catch(() => []),
+          getMyNotifications(profile.id).catch(() => []),
+        ])
+
+        if (isMounted) {
+          setAssignments(a || [])
+          setProgressMap(p || {})
+          setCertificates(c || [])
+          setNotifications(n || [])
+        }
+      } catch (err) {
+        console.error('Error loading dashboard data:', err)
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadData()
+
+    return () => {
+      isMounted = false
+    }
   }, [profile?.id])
 
-  if (error) return <div className="text-rose-400 p-4">{error}</div>
-  if (!assignments) return <Spinner />
+  // مؤقت أمان إجباري يمنع أي تعليق لأكثر من 1.5 ثانية
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false)
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Spinner label="Loading dashboard..." />
+      </div>
+    )
+  }
 
   const inProgress = assignments.filter((a) => a?.status === 'in_progress' || a?.status === 'started' || a?.status === 'assigned')
   const completed = assignments.filter((a) => a?.status === 'completed')
