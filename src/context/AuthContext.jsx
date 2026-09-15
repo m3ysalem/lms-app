@@ -8,29 +8,38 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  const loadProfile = useCallback(async (userId) => {
-    if (!userId) {
+  const loadProfile = useCallback(async (user) => {
+    if (!user?.id) {
       setProfile(null)
       setLoading(false)
       return
     }
     
     try {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('profiles')
-        .select('*, department:department_id(id,name), job_title:job_title_id(id,title)')
-        .eq('id', userId)
+        .select('*')
+        .eq('id', user.id)
         .maybeSingle()
 
-      if (error) {
-        console.error('Failed to load profile', error)
-        setProfile(null)
-      } else {
-        setProfile(data)
+      if (error || !data) {
+        data = {
+          id: user.id,
+          email: user.email,
+          full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+          role: 'employee',
+        }
       }
+
+      setProfile(data)
     } catch (err) {
-      console.error(err)
-      setProfile(null)
+      console.error('Error loading profile:', err)
+      setProfile({
+        id: user.id,
+        email: user.email,
+        full_name: user.email?.split('@')[0] || 'User',
+        role: 'employee',
+      })
     } finally {
       setLoading(false)
     }
@@ -42,8 +51,8 @@ export function AuthProvider({ children }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return
       setSession(session)
-      if (session?.user?.id) {
-        loadProfile(session.user.id)
+      if (session?.user) {
+        loadProfile(session.user)
       } else {
         setLoading(false)
       }
@@ -51,8 +60,8 @@ export function AuthProvider({ children }) {
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
-      if (session?.user?.id) {
-        loadProfile(session.user.id)
+      if (session?.user) {
+        loadProfile(session.user)
       } else {
         setProfile(null)
         setLoading(false)
@@ -72,17 +81,18 @@ export function AuthProvider({ children }) {
 
   const signOut = async () => {
     await supabase.auth.signOut()
+    setProfile(null)
   }
 
   const value = {
     session,
     user: session?.user ?? null,
     profile,
-    role: profile?.role ?? null,
+    role: profile?.role ?? 'employee',
     loading,
     signIn,
     signOut,
-    refreshProfile: () => loadProfile(session?.user?.id),
+    refreshProfile: () => session?.user && loadProfile(session.user),
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
