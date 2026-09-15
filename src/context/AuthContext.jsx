@@ -11,20 +11,28 @@ export function AuthProvider({ children }) {
   const loadProfile = useCallback(async (userId) => {
     if (!userId) {
       setProfile(null)
+      setLoading(false)
       return
     }
-    // استبدلنا .single() بـ .maybeSingle() عشان تمنع الإيرور لو البروفايل لسه مش موجود
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*, department:department_id(id,name), job_title:job_title_id(id,title)')
-      .eq('id', userId)
-      .maybeSingle()
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*, department:department_id(id,name), job_title:job_title_id(id,title)')
+        .eq('id', userId)
+        .maybeSingle()
 
-    if (error) {
-      console.error('Failed to load profile', error)
+      if (error) {
+        console.error('Failed to load profile', error)
+        setProfile(null)
+      } else {
+        setProfile(data)
+      }
+    } catch (err) {
+      console.error(err)
       setProfile(null)
-    } else {
-      setProfile(data)
+    } finally {
+      setLoading(false) // تضمن إن الـ loading يقف تماماً في كل الأحوال
     }
   }, [])
 
@@ -34,12 +42,21 @@ export function AuthProvider({ children }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return
       setSession(session)
-      loadProfile(session?.user?.id).finally(() => setLoading(false))
+      if (session?.user?.id) {
+        loadProfile(session.user.id)
+      } else {
+        setLoading(false)
+      }
     })
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
-      loadProfile(session?.user?.id)
+      if (session?.user?.id) {
+        loadProfile(session.user.id)
+      } else {
+        setProfile(null)
+        setLoading(false)
+      }
     })
 
     return () => {
