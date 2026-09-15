@@ -12,11 +12,9 @@ export default function Profile() {
   const [saved, setSaved] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
-  // تحديث الحقول فور وصول بيانات البروفايل مع تنظيف أي كود وظيفي قديم
   useEffect(() => {
     if (profile) {
       const rawName = profile.full_name || profile.name || ''
-      // إذا كان الاسم مسجلاً ككود وظيفي، نجعل الخانة فارغة أو نقترح جزء من الإيميل لتسهيل التعديل
       if (!rawName || rawName.toLowerCase().includes('emp')) {
         const emailPrefix = profile.email?.split('@')[0]
         setFullName(emailPrefix && !emailPrefix.toLowerCase().includes('emp') ? emailPrefix : '')
@@ -41,15 +39,23 @@ export default function Profile() {
     setErrorMsg('')
 
     try {
-      // 1. تحديث بيانات البروفايل (الاسم والرقم) في جدول profiles
-      const { error: profileErr } = await supabase
+      console.log('Attempting to update profile for id:', profile.id, { full_name: fullName, phone })
+
+      // محاولة التحديث في جدول profiles
+      const { data, error: profileErr } = await supabase
         .from('profiles')
         .update({ full_name: fullName.trim(), phone: phone.trim() })
         .eq('id', profile.id)
+        .select()
 
-      if (profileErr) throw profileErr
+      if (profileErr) {
+        console.error('Supabase profile update error:', profileErr)
+        throw new Error(profileErr.message || 'Failed to update database profile')
+      }
 
-      // 2. تحديث كلمة المرور إذا قام بإدخال كلمة جديدة
+      console.log('Profile update result:', data)
+
+      // تحديث كلمة المرور إذا وجدت
       if (newPassword.trim()) {
         const { error: pwdErr } = await supabase.auth.updateUser({
           password: newPassword.trim(),
@@ -62,6 +68,7 @@ export default function Profile() {
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     } catch (err) {
+      console.error('Catch error:', err)
       setErrorMsg(err.message || 'Failed to update profile')
     } finally {
       setSaving(false)
@@ -85,7 +92,6 @@ export default function Profile() {
         <p className="text-gray-400 mt-1 text-sm">Manage your personal information and account settings.</p>
       </div>
 
-      {/* Editable Information Form */}
       <form onSubmit={handleSaveProfile} className="p-5 rounded-2xl bg-[#14181d]/85 border border-white/10 backdrop-blur-xl shadow-xl space-y-4">
         <h2 className="font-semibold text-lg border-b border-white/10 pb-2">Edit Details</h2>
         
@@ -134,11 +140,10 @@ export default function Profile() {
         </div>
       </form>
 
-      {/* Official HR Record (Read-Only) */}
       <div className="p-5 rounded-2xl bg-[#14181d]/85 border border-white/10 backdrop-blur-xl shadow-xl space-y-3">
         <h2 className="font-semibold text-base text-gray-400">Official HR Information</h2>
         <div className="divide-y divide-white/10">
-          {rows.map(([label, value]) => (
+          {rows.map(([label, value]) =>(
             <div key={label} className="py-2.5 flex justify-between text-sm">
               <span className="text-gray-400">{label}</span>
               <span className="text-white font-medium">{value}</span>
