@@ -39,18 +39,14 @@ export default function Profile() {
     setErrorMsg('')
 
     try {
-      // تحديث بيانات البروفايل في جدول profiles بدون تداخل
-      const { error: profileErr } = await supabase
-        .from('profiles')
-        .update({ 
-          full_name: fullName.trim(), 
-          phone: phone.trim() 
-        })
-        .eq('id', profile.id)
+      // استدعاء دالة الأمان في قاعدة البيانات لتحديث الاسم ورقم الهاتف
+      const { error: rpcErr } = await supabase.rpc('update_user_profile', {
+        user_id: profile.id,
+        new_name: fullName.trim(),
+        new_phone: phone.trim()
+      })
 
-      if (profileErr) {
-        throw new Error(profileErr.message)
-      }
+      if (rpcErr) throw new Error(rpcErr.message)
 
       // تحديث كلمة المرور إذا تم إدخالها
       if (newPassword.trim()) {
