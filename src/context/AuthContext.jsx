@@ -22,16 +22,23 @@ export function AuthProvider({ children }) {
         .eq('id', user.id)
         .maybeSingle()
 
+      // استخراج واختيار أفضل اسم متاح
+      let rawName = data?.full_name || data?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'User'
+      
+      // لو الاسم عبارة عن كود وظيفي (يبدأ بـ emp أو EMP)، نقوم بتنظيفه واستبداله بجزء من الإيميل أو اسم افتراضي لطيف
+      if (rawName.toLowerCase().startsWith('emp')) {
+        rawName = user.email?.split('@')[0] || 'User'
+      }
+
       if (error || !data) {
         data = {
           id: user.id,
           email: user.email,
-          full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+          full_name: rawName,
           role: 'employee',
         }
       } else {
-        // ضمان اختيار الاسم الحقيقي الصحيح بغض النظر عن اسم العمود في قاعدة البيانات
-        data.full_name = data.full_name || data.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'User'
+        data.full_name = rawName
       }
 
       setProfile(data)
