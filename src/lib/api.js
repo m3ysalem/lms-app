@@ -80,21 +80,43 @@ export async function getMyNotifications(employeeId) {
 }
 
 // ---------- Course catalog & player ----------
-export async function getPublishedCourses() {
+export async function getPublishedCourses(employeeId) {
   try {
-    const { data, error } = await supabase
+    // 1. جلب قسم الموظف الحالي أولاً للتصفية بدقة
+    let userDeptId = null;
+    if (employeeId) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('department_id')
+        .eq('id', employeeId)
+        .maybeSingle();
+      
+      userDeptId = profile?.department_id;
+    }
+
+    // 2. بناء استعلام الكورسات المنشورة
+    let query = supabase
       .from('courses')
       .select('*')
-      .eq('status', 'published')
+      .eq('status', 'published');
+
+    // 3. تصفية الكورسات: إما مخصصة لقسم الموظف أو عامة (null)
+    if (userDeptId) {
+      query = query.or(`department_id.eq.${userDeptId},department_id.is.null`);
+    } else {
+      query = query.is('department_id', null);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
-      const { data: allCourses } = await supabase.from('courses').select('*')
-      return allCourses || []
+      const { data: allCourses } = await supabase.from('courses').select('*');
+      return allCourses || [];
     }
-    return data || []
+    return data || [];
   } catch (err) {
-    console.error('getPublishedCourses error:', err)
-    return []
+    console.error('getPublishedCourses error:', err);
+    return [];
   }
 }
 
