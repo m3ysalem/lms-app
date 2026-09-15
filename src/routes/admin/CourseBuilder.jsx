@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { getCourseWithStructure, addModule, addLesson, addQuiz, addQuestion, addAnswers, updateCourse } from '../../lib/api'
+import { supabase } from '../../lib/supabaseClient'
 import { Badge, Spinner } from '../../components/Ui'
 
 const CONTENT_TYPES = ['text', 'video', 'external_video', 'external_url', 'pdf', 'pptx', 'docx', 'image']
@@ -8,6 +9,8 @@ const CONTENT_TYPES = ['text', 'video', 'external_video', 'external_url', 'pdf',
 export default function CourseBuilder() {
   const { courseId } = useParams()
   const [data, setData] = useState(null)
+  const [departments, setDepartments] = useState([])
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState('')
   const [newModuleTitle, setNewModuleTitle] = useState('')
   const [lessonForms, setLessonForms] = useState({})
   const [questionForm, setQuestionForm] = useState({ 
@@ -19,8 +22,28 @@ export default function CourseBuilder() {
   })
   const [busy, setBusy] = useState(false)
 
+  // جلب الأقسام المتاحة من قاعدة البيانات
+  useEffect(() => {
+    async function fetchDepartments() {
+      try {
+        const { data: deptData, error } = await supabase.from('departments').select('id, name')
+        if (!error && deptData) {
+          setDepartments(deptData)
+        }
+      } catch (err) {
+        console.error('Error fetching departments:', err)
+      }
+    }
+    fetchDepartments()
+  }, [])
+
   const load = useCallback(() => {
-    getCourseWithStructure(courseId).then(setData).catch((err) => {
+    getCourseWithStructure(courseId).then((res) => {
+      setData(res)
+      if (res?.course?.department_id) {
+        setSelectedDepartmentId(res.course.department_id)
+      }
+    }).catch((err) => {
       console.error('Error loading course structure:', err)
     })
   }, [courseId])
@@ -39,6 +62,19 @@ export default function CourseBuilder() {
       load()
     } catch (err) {
       alert('Error updating status: ' + err.message)
+    }
+  }
+
+  // تحديث الإدارة المستهدفة للكورس مباشرة عند تغييرها
+  const handleDepartmentChange = async (e) => {
+    const newDeptId = e.target.value
+    setSelectedDepartmentId(newDeptId)
+    try {
+      await updateCourse(course.id, {
+        department_id: newDeptId || null
+      })
+    } catch (err) {
+      alert('Failed to update course department: ' + err.message)
     }
   }
 
@@ -129,55 +165,73 @@ export default function CourseBuilder() {
   }
 
   return (
-    <div className="space-y-8 max-w-3xl">
+    <div className="space-y-8 max-w-3xl text-white">
       <div>
-        <Link to="/admin/courses" className="text-sm text-teal hover:underline">← All courses</Link>
+        <Link to="/admin/courses" className="text-sm text-rose-400 hover:underline">← All courses</Link>
         <div className="flex items-center justify-between mt-2">
           <h1 className="text-2xl font-bold">{course.name}</h1>
           <div className="flex items-center gap-2">
             <Badge tone={course.status === 'published' ? 'success' : 'default'}>{course.status}</Badge>
-            <button className="btn-secondary text-sm" onClick={togglePublish}>
+            <button className="px-3 py-1.5 rounded-lg bg-white/10 text-sm hover:bg-white/20 transition-colors" onClick={togglePublish}>
               {course.status === 'published' ? 'Unpublish' : 'Publish'}
             </button>
           </div>
         </div>
-        <p className="text-muted mt-1">{course.course_code} · Passing score {course.passing_score}%</p>
+        <p className="text-gray-400 mt-1">{course.course_code} · Passing score {course.passing_score}%</p>
+      </div>
+
+      {/* خانة اختيار الإدارة المستهدفة للكورس */}
+      <div className="p-4 rounded-2xl bg-[#14181d]/85 border border-white/10 backdrop-blur-xl space-y-2">
+        <label className="block text-sm font-medium text-gray-300">Target Department (الإدارة المستهدفة للكورس)</label>
+        <select
+          className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none"
+          value={selectedDepartmentId}
+          onChange={handleDepartmentChange}
+        >
+          <option value="">All Departments (عام لكل الإدارات)</option>
+          {departments.map((dept) => (
+            <option key={dept.id} value={dept.id} className="bg-gray-900 text-white">
+              {dept.name}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-gray-400">إذا حددت إدارة معينة، فلن يظهر هذا الكورس إلا للموظفين التابعين لنفس هذه الإدارة.</p>
       </div>
 
       <section className="space-y-4">
         <h2 className="font-head font-semibold text-lg">Modules &amp; lessons</h2>
         {modules.map((m) => (
-          <div key={m.id} className="card p-4">
-            <p className="font-medium text-ink-800 mb-2">{m.title}</p>
+          <div key={m.id} className="p-4 rounded-2xl bg-[#14181d]/85 border border-white/10 backdrop-blur-xl space-y-3">
+            <p className="font-medium text-white mb-2">{m.title}</p>
             <ul className="space-y-1 mb-3">
               {m.lessons.map((l) => (
-                <li key={l.id} className="text-sm text-ink-700 flex items-center gap-2">
-                  <span className="text-muted">•</span> {l.title} <Badge>{l.content_type}</Badge>
+                <li key={l.id} className="text-sm text-gray-300 flex items-center gap-2">
+                  <span className="text-gray-500">•</span> {l.title} <Badge>{l.content_type}</Badge>
                 </li>
               ))}
-              {m.lessons.length === 0 && <li className="text-sm text-muted">No lessons yet.</li>}
+              {m.lessons.length === 0 && <li className="text-sm text-gray-400">No lessons yet.</li>}
             </ul>
 
             <details className="text-sm">
-              <summary className="text-teal cursor-pointer select-none">+ Add lesson</summary>
-              <div className="mt-3 space-y-2 border-t border-surface-border pt-3">
-                <input className="input" placeholder="Lesson title" value={lessonForms[m.id]?.title || ''} onChange={(e) => updateLessonForm(m.id, { title: e.target.value })} />
+              <summary className="text-rose-400 cursor-pointer select-none font-medium">+ Add lesson</summary>
+              <div className="mt-3 space-y-2 border-t border-white/10 pt-3">
+                <input className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none" placeholder="Lesson title" value={lessonForms[m.id]?.title || ''} onChange={(e) => updateLessonForm(m.id, { title: e.target.value })} />
                 <div className="grid grid-cols-2 gap-2">
-                  <select className="input" value={lessonForms[m.id]?.content_type || 'text'} onChange={(e) => updateLessonForm(m.id, { content_type: e.target.value })}>
-                    {CONTENT_TYPES.map((t) => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
+                  <select className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none" value={lessonForms[m.id]?.content_type || 'text'} onChange={(e) => updateLessonForm(m.id, { content_type: e.target.value })}>
+                    {CONTENT_TYPES.map((t) => <option key={t} value={t} className="bg-gray-900">{t.replace('_', ' ')}</option>)}
                   </select>
-                  <input className="input" type="number" placeholder="Minutes" value={lessonForms[m.id]?.duration_minutes || ''} onChange={(e) => updateLessonForm(m.id, { duration_minutes: e.target.value })} />
+                  <input className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none" type="number" placeholder="Minutes" value={lessonForms[m.id]?.duration_minutes || ''} onChange={(e) => updateLessonForm(m.id, { duration_minutes: e.target.value })} />
                 </div>
                 {(lessonForms[m.id]?.content_type === 'video' || lessonForms[m.id]?.content_type === 'external_video') ? (
-                  <input className="input" placeholder="Video URL (embed link)" value={lessonForms[m.id]?.video_url || ''} onChange={(e) => updateLessonForm(m.id, { video_url: e.target.value })} />
+                  <input className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none" placeholder="Video URL (embed link)" value={lessonForms[m.id]?.video_url || ''} onChange={(e) => updateLessonForm(m.id, { video_url: e.target.value })} />
                 ) : lessonForms[m.id]?.content_type === 'external_url' ? (
-                  <input className="input" placeholder="External URL" value={lessonForms[m.id]?.body || ''} onChange={(e) => updateLessonForm(m.id, { body: e.target.value })} />
+                  <input className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none" placeholder="External URL" value={lessonForms[m.id]?.body || ''} onChange={(e) => updateLessonForm(m.id, { body: e.target.value })} />
                 ) : lessonForms[m.id]?.content_type === 'text' ? (
-                  <textarea className="input" rows={3} placeholder="Lesson text content" value={lessonForms[m.id]?.body || ''} onChange={(e) => updateLessonForm(m.id, { body: e.target.value })} />
+                  <textarea className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none" rows={3} placeholder="Lesson text content" value={lessonForms[m.id]?.body || ''} onChange={(e) => updateLessonForm(m.id, { body: e.target.value })} />
                 ) : (
-                  <p className="text-xs text-muted">File upload goes through Supabase Storage.</p>
+                  <p className="text-xs text-gray-400">File upload goes through Supabase Storage.</p>
                 )}
-                <button type="button" className="btn-secondary" disabled={busy} onClick={() => createLesson(m.id, m.lessons.length + 1)}>
+                <button type="button" className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-medium transition-colors" disabled={busy} onClick={() => createLesson(m.id, m.lessons.length + 1)}>
                   Add lesson
                 </button>
               </div>
@@ -186,37 +240,37 @@ export default function CourseBuilder() {
         ))}
 
         <form onSubmit={createModule} className="flex gap-2">
-          <input className="input" placeholder="New module title" value={newModuleTitle} onChange={(e) => setNewModuleTitle(e.target.value)} />
-          <button type="submit" className="btn-secondary shrink-0" disabled={busy}>Add module</button>
+          <input className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none" placeholder="New module title" value={newModuleTitle} onChange={(e) => setNewModuleTitle(e.target.value)} />
+          <button type="submit" className="px-5 py-2.5 rounded-lg bg-white/10 hover:bg-white/20 font-medium shrink-0 transition-colors" disabled={busy}>Add module</button>
         </form>
       </section>
 
       <section className="space-y-4">
         <h2 className="font-head font-semibold text-lg">Quiz</h2>
         {!quiz ? (
-          <button className="btn-secondary" onClick={createQuiz}>Create final quiz</button>
+          <button className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 font-medium transition-colors" onClick={createQuiz}>Create final quiz</button>
         ) : (
-          <div className="card p-4 space-y-4">
-            <p className="text-sm text-muted">Passing score {quiz.passing_score}% · Max attempts {quiz.max_attempts}</p>
+          <div className="p-4 rounded-2xl bg-[#14181d]/85 border border-white/10 backdrop-blur-xl space-y-4">
+            <p className="text-sm text-gray-400">Passing score {quiz.passing_score}% · Max attempts {quiz.max_attempts}</p>
 
             <div className="space-y-2">
-              <label className="label">Question text</label>
-              <input className="input" value={questionForm.text} onChange={(e) => setQuestionForm({ ...questionForm, text: e.target.value })} />
+              <label className="block text-sm font-medium text-gray-300">Question text</label>
+              <input className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none" value={questionForm.text} onChange={(e) => setQuestionForm({ ...questionForm, text: e.target.value })} />
               <div className="grid grid-cols-2 gap-2">
-                <select className="input" value={questionForm.type} onChange={(e) => setQuestionForm({ ...questionForm, type: e.target.value })}>
-                  <option value="multiple_choice">Multiple choice</option>
-                  <option value="true_false">True / False</option>
-                  <option value="multiple_answer">Multiple answer</option>
-                  <option value="text">Text / Essay</option>
+                <select className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none" value={questionForm.type} onChange={(e) => setQuestionForm({ ...questionForm, type: e.target.value })}>
+                  <option value="multiple_choice" className="bg-gray-900">Multiple choice</option>
+                  <option value="true_false" className="bg-gray-900">True / False</option>
+                  <option value="multiple_answer" className="bg-gray-900">Multiple answer</option>
+                  <option value="text" className="bg-gray-900">Text / Essay</option>
                 </select>
-                <input className="input" type="number" min={1} value={questionForm.points} onChange={(e) => setQuestionForm({ ...questionForm, points: e.target.value })} />
+                <input className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none" type="number" min={1} value={questionForm.points} onChange={(e) => setQuestionForm({ ...questionForm, points: e.target.value })} />
               </div>
 
               {(questionForm.type === 'text' || questionForm.type === 'essay') ? (
                 <div className="space-y-1 mt-2">
-                  <label className="label">Correct Answer (Model Answer for evaluation)</label>
+                  <label className="block text-sm font-medium text-gray-300">Correct Answer (Model Answer for evaluation)</label>
                   <textarea 
-                    className="input" 
+                    className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none" 
                     rows={2} 
                     placeholder="Type the correct model answer here..." 
                     value={questionForm.correct_answer_text} 
@@ -225,7 +279,7 @@ export default function CourseBuilder() {
                 </div>
               ) : (
                 <>
-                  <p className="label">Answers (check the correct one(s))</p>
+                  <p className="block text-sm font-medium text-gray-300">Answers (check the correct one(s))</p>
                   {questionForm.answers.map((a, i) => (
                     <div key={i} className="flex items-center gap-2">
                       <input
@@ -241,7 +295,7 @@ export default function CourseBuilder() {
                         }}
                       />
                       <input
-                        className="input"
+                        className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none"
                         placeholder={`Answer ${i + 1}`}
                         value={a.text}
                         onChange={(e) => {
@@ -254,7 +308,7 @@ export default function CourseBuilder() {
                   ))}
                   <button
                     type="button"
-                    className="text-teal text-sm hover:underline"
+                    className="text-rose-400 text-sm hover:underline font-medium"
                     onClick={() => setQuestionForm({ ...questionForm, answers: [...questionForm.answers, { text: '', correct: false }] })}
                   >
                     + Add answer option
@@ -263,7 +317,7 @@ export default function CourseBuilder() {
               )}
 
               <div className="pt-2">
-                <button type="button" className="btn-primary" disabled={busy} onClick={createQuestion}>Add question</button>
+                <button type="button" className="px-5 py-2 rounded-lg bg-gradient-to-r from-[#9E1B1B] to-rose-700 text-white font-medium shadow-lg shadow-red-950/50" disabled={busy} onClick={createQuestion}>Add question</button>
               </div>
             </div>
           </div>
