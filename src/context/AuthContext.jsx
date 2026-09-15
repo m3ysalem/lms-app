@@ -29,6 +29,9 @@ export function AuthProvider({ children }) {
           full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
           role: 'employee',
         }
+      } else {
+        // ضمان اختيار الاسم الحقيقي الصحيح بغض النظر عن اسم العمود في قاعدة البيانات
+        data.full_name = data.full_name || data.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'User'
       }
 
       setProfile(data)
