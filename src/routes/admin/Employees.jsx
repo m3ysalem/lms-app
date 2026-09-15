@@ -23,7 +23,7 @@ export default function Employees() {
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(emptyForm)
-  const [saving, setSaving]  = useState(false)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [importResult, setImportResult] = useState(null)
   const fileRef = useRef(null)
@@ -52,7 +52,10 @@ export default function Employees() {
 
       const finalPassword = form.password || 'Password123!'
 
-      // 1. إنشاء المستخدم الجديد عبر الـ SignUp
+      // 1. حفظ جلسة الأدمن الحالي قبل أي خطوة
+      const { data: { session: adminSession } } = await supabase.auth.getSession()
+
+      // 2. إنشاء المستخدم الجديد بالطريقة الرسمية السليمة من Supabase
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: finalEmail,
         password: finalPassword,
@@ -71,7 +74,7 @@ export default function Employees() {
         throw new Error('Failed to create authentication user ID.')
       }
 
-      // 2. إدخال البروفايل في جدول public.profiles
+      // 3. إدخال البروفايل في جدول public.profiles
       const { error: profileError } = await supabase
         .from('profiles')
         .insert([
@@ -91,13 +94,18 @@ export default function Employees() {
 
       if (profileError) throw profileError
 
+      // 4. استعادة جلسة الأدمن فوراً لضمان بقائه في لوحة التحكم
+      if (adminSession) {
+        await supabase.auth.setSession({
+          access_token: adminSession.access_token,
+          refresh_token: adminSession.refresh_token
+        })
+      }
+
       setSaving(false)
       setShowForm(false)
       setForm(emptyForm)
-      
-      // 3. إعادة تحميل الصفحة لتثبيت جلسة الأدمن وعرض الموظف الجديد في القائمة فوراً
-      window.location.reload()
-
+      refresh()
     } catch (err) {
       setSaving(false)
       setError(err.message || 'Failed to create employee.')
@@ -129,6 +137,9 @@ export default function Employees() {
         const rows = results.data
         const errors = []
         let success = 0
+
+        // حفظ جلسة الأدمن قبل البدء في الـ Loop للرفع الجماعي
+        const { data: { session: adminSession } } = await supabase.auth.getSession()
 
         for (const row of rows) {
           if (!row['Name'] || !row['Employee ID']) {
@@ -180,6 +191,14 @@ export default function Employees() {
           } catch (err) {
             errors.push(`${row['Employee ID']}: ${err.message}`)
           }
+        }
+
+        // استعادة جلسة الأدمن بعد انتهاء الـ Loop
+        if (adminSession) {
+          await supabase.auth.setSession({
+            access_token: adminSession.access_token,
+            refresh_token: adminSession.refresh_token
+          })
         }
 
         setImportResult({ success, errors })
