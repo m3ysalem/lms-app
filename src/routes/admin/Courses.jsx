@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { listAllCourses, createCourse, listCategories, listTrainers } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { Badge, Spinner } from '../../components/Ui'
+import { supabase } from '../../lib/supabaseClient' // أضفنا استيراد supabase لجلب وحفظ الإدارات المرتبطة
 
 const TRAINING_TYPES = ['classroom', 'online', 'video', 'e_learning', 'workshop', 'external', 'webinar', 'blended']
 
@@ -10,6 +11,7 @@ const emptyForm = {
   name: '', description: '', category_id: '', training_type: 'online', trainer_id: '',
   duration_minutes: 60, difficulty: 'beginner', passing_score: 80,
   certificate_eligible: true, is_required: false, status: 'draft',
+  departments: [] // أضفنا مصفوفة الإدارات هنا بدون تغيير أي شيء قديم
 }
 
 export default function AdminCourses() {
@@ -17,6 +19,7 @@ export default function AdminCourses() {
   const [courses, setCourses] = useState(null)
   const [categories, setCategories] = useState([])
   const [trainers, setTrainers] = useState([])
+  const [departments, setDepartments] = useState([]) // حالة لحفظ الإدارات
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
@@ -28,6 +31,10 @@ export default function AdminCourses() {
     refresh()
     listCategories().then(setCategories)
     listTrainers().then(setTrainers)
+    // جلب الإدارات من جدول departments مباشرة
+    supabase.from('departments').select('*').then(({ data }) => {
+      if (data) setDepartments(data)
+    })
   }, [])
 
   const submit = async (e) => {
@@ -36,12 +43,46 @@ export default function AdminCourses() {
     setError('')
     try {
       const count = (courses?.length || 0) + 1
-      await createCourse({
-        ...form,
+      
+      // 1. إنشاء الكورس بالطريقة الأصلية تماماً
+      const newCourseData = {
+        name: form.name,
+        description: form.description,
+        category_id: form.category_id,
+        training_type: form.training_type,
+        trainer_id: form.trainer_id,
+        duration_minutes: form.duration_minutes,
+        difficulty: form.difficulty,
+        passing_score: form.passing_score,
+        certificate_eligible: form.certificate_eligible,
+        is_required: form.is_required,
+        status: form.status,
         course_code: `CRS-${String(count).padStart(4, '0')}`,
         created_by: profile.id,
         publish_date: form.status === 'published' ? new Date().toISOString().slice(0, 10) : null,
-      })
+      }
+
+      // بما أن دالة createCourse قد تختلف في الـ API، سنستعمل الـ API المعتاد ونلتقط الكورس الناتج أو ننشئه عبر الـ API
+      const created = await createCourse(newCourseData)
+
+      // لو الـ API رجع الـ id بتاع الكورس الجديد (أو بنجيبه بآخر كورس أضيف لو مش بيجيبه)
+      // نفترض أن الـ createCourse بترجع الكورس أو بنجيبه من الـ id المباشر
+      let courseId = created?.id;
+      if (!courseId) {
+        // لو الدالة مش بترجع الكอร์س، هنجيب أحدث كورس أضيف بالـ code أو الاسم
+        const { data: latest } = await supabase.from('courses').select('id').eq('course_code', newCourseData.course_code).single()
+        if (latest) courseId = latest.id
+      }
+
+      // 2. ربط الإدارات المختارة بالكورس في جدول course_departments
+      if (courseId && form.departments && form.departments.length > 0) {
+        const insertRows = form.departments.map(deptId => ({
+          course_id: courseId,
+          department_id: deptId
+        }))
+        await supabase.from('course_departments').insert(insertRows)
+      }
+
       setShowForm(false)
       setForm(emptyForm)
       refresh()
@@ -117,6 +158,33 @@ export default function AdminCourses() {
               </select>
             </div>
           </div>
+
+          {/* إضافة خانات اختيار الإدارات هنا بدقة وبدون المساس بأي شيء */}
+          <div>
+            <label className="label mb-1">Target Departments (الإدارات المستهدفة)</label>
+            <div className="space-y-2 border border-surface-border p-3 rounded bg-surface">
+              {departments.map((dept) => {
+                const isChecked = form.departments.includes(dept.id)
+                return (
+                  <label key={dept.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(e) => {
+                        const updatedDepts = e.target.checked
+                          ? [...form.departments, dept.id]
+                          : form.departments.filter(id => id !== dept.id)
+                        setForm({ ...form, departments: updatedDepts })
+                      }}
+                    />
+                    {dept.name}
+                  </label>
+                )
+              })}
+              {departments.length === 0 && <p className="text-xs text-muted">No departments found.</p>}
+            </div>
+          </div>
+
           <div className="flex gap-4 text-sm">
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={form.certificate_eligible} onChange={(e) => setForm({ ...form, certificate_eligible: e.target.checked })} />
