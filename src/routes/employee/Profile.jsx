@@ -39,23 +39,20 @@ export default function Profile() {
     setErrorMsg('')
 
     try {
-      console.log('Attempting to update profile for id:', profile.id, { full_name: fullName, phone })
-
-      // محاولة التحديث في جدول profiles
-      const { data, error: profileErr } = await supabase
+      // تحديث بيانات البروفايل في جدول profiles بدون تداخل
+      const { error: profileErr } = await supabase
         .from('profiles')
-        .update({ full_name: fullName.trim(), phone: phone.trim() })
+        .update({ 
+          full_name: fullName.trim(), 
+          phone: phone.trim() 
+        })
         .eq('id', profile.id)
-        .select()
 
       if (profileErr) {
-        console.error('Supabase profile update error:', profileErr)
-        throw new Error(profileErr.message || 'Failed to update database profile')
+        throw new Error(profileErr.message)
       }
 
-      console.log('Profile update result:', data)
-
-      // تحديث كلمة المرور إذا وجدت
+      // تحديث كلمة المرور إذا تم إدخالها
       if (newPassword.trim()) {
         const { error: pwdErr } = await supabase.auth.updateUser({
           password: newPassword.trim(),
@@ -68,7 +65,7 @@ export default function Profile() {
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     } catch (err) {
-      console.error('Catch error:', err)
+      console.error('Profile update error:', err)
       setErrorMsg(err.message || 'Failed to update profile')
     } finally {
       setSaving(false)
@@ -143,7 +140,7 @@ export default function Profile() {
       <div className="p-5 rounded-2xl bg-[#14181d]/85 border border-white/10 backdrop-blur-xl shadow-xl space-y-3">
         <h2 className="font-semibold text-base text-gray-400">Official HR Information</h2>
         <div className="divide-y divide-white/10">
-          {rows.map(([label, value]) =>(
+          {rows.map(([label, value]) => (
             <div key={label} className="py-2.5 flex justify-between text-sm">
               <span className="text-gray-400">{label}</span>
               <span className="text-white font-medium">{value}</span>
