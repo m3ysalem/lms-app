@@ -3,6 +3,25 @@ import { supabase } from '../lib/supabaseClient'
 
 const AuthContext = createContext(null)
 
+// دالة مساعدة لتنظيف الاسم والتأكد أنه ليس كوداً وظيفياً
+function getCleanName(dbName, email) {
+  if (!dbName) return email?.split('@')[0] || 'User'
+  
+  const lower = dbName.toLowerCase().trim()
+  // لو الاسم يبدأ بـ emp أو يحتوي على emp_ أو عبارة عن أكواد متشابهة
+  if (lower.startsWith('emp') || lower.includes('emp_')) {
+    // حاول نطلع الاسم من الإيميل، ولو مش موجود نرجع كلمة افتراضية لطيفة
+    const emailPrefix = email?.split('@')[0]
+    if (emailPrefix && !emailPrefix.toLowerCase().includes('emp')) {
+      // تحويل أول حرف لـ Capital لأجل الشياكة (مثلاً mohamed -> Mohamed)
+      return emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1)
+    }
+    return 'Employee'
+  }
+  
+  return dbName
+}
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -22,23 +41,19 @@ export function AuthProvider({ children }) {
         .eq('id', user.id)
         .maybeSingle()
 
-      // استخراج واختيار أفضل اسم متاح
-      let rawName = data?.full_name || data?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'User'
-      
-      // لو الاسم يحتوي على كلمة emp أو مكتوب ككود وظيفي، يتم استبداله بالإيميل فوراً
-      if (!rawName || rawName.toLowerCase().includes('emp')) {
-        rawName = user.email?.split('@')[0] || 'User'
-      }
+      // استخراج الاسم الخام وتطبيق دالة التنظيف الصارمة
+      const rawDbName = data?.full_name || data?.name || user.user_metadata?.full_name
+      const cleanedName = getCleanName(rawDbName, user.email)
 
       if (error || !data) {
         data = {
           id: user.id,
           email: user.email,
-          full_name: rawName,
+          full_name: cleanedName,
           role: 'employee',
         }
       } else {
-        data.full_name = rawName
+        data.full_name = cleanedName
       }
 
       setProfile(data)
@@ -47,7 +62,7 @@ export function AuthProvider({ children }) {
       setProfile({
         id: user.id,
         email: user.email,
-        full_name: user.email?.split('@')[0] || 'User',
+        full_name: getCleanName(null, user.email),
         role: 'employee',
       })
     } finally {
