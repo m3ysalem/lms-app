@@ -36,6 +36,12 @@ export default function Layout({ children }) {
     navigate('/login')
   }
 
+  // معالجة ذكية للاسم لضمان عدم ظهور الكود الوظيفي كاسم رئيسي
+  const rawName = profile?.full_name || profile?.name || profile?.email?.split('@')[0] || 'User'
+  const displayName = rawName.startsWith('emp') || rawName.startsWith('EMP') 
+    ? (profile?.email?.split('@')[0] || rawName) 
+    : rawName
+
   return (
     <div className="min-h-screen flex relative bg-[#0d0f12] overflow-x-hidden bg-cover bg-center bg-fixed" style={{ backgroundImage: `url('/company-bg.jpg')` }}>
       
@@ -82,7 +88,7 @@ export default function Layout({ children }) {
         </nav>
 
         <div className="p-4 m-3 rounded-2xl bg-white/[0.03] border border-white/10 shadow-inner backdrop-blur-md">
-          <p className="text-sm font-bold truncate text-white">{profile?.full_name}</p>
+          <p className="text-sm font-bold truncate text-white">{displayName}</p>
           <p className="text-xs text-gray-400 truncate mb-3">{profile?.employee_code || profile?.email}</p>
           <button 
             onClick={handleSignOut} 
