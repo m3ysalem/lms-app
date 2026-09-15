@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabaseClient'
 import { Spinner } from '../../components/Ui'
@@ -12,10 +12,17 @@ export default function Profile() {
   const [saved, setSaved] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
-  // تحديث الحقول فور وصول بيانات البروفايل الحقيقية
+  // تحديث الحقول فور وصول بيانات البروفايل مع تنظيف أي كود وظيفي قديم
   useEffect(() => {
     if (profile) {
-      setFullName(profile.full_name || profile.name || '')
+      const rawName = profile.full_name || profile.name || ''
+      // إذا كان الاسم مسجلاً ككود وظيفي، نجعل الخانة فارغة أو نقترح جزء من الإيميل لتسهيل التعديل
+      if (!rawName || rawName.toLowerCase().includes('emp')) {
+        const emailPrefix = profile.email?.split('@')[0]
+        setFullName(emailPrefix && !emailPrefix.toLowerCase().includes('emp') ? emailPrefix : '')
+      } else {
+        setFullName(rawName)
+      }
       setPhone(profile.phone || '')
     }
   }, [profile])
@@ -34,15 +41,15 @@ export default function Profile() {
     setErrorMsg('')
 
     try {
-      // 1. تحديث بيانات البروفايل (الاسم والرقم)
+      // 1. تحديث بيانات البروفايل (الاسم والرقم) في جدول profiles
       const { error: profileErr } = await supabase
         .from('profiles')
-        .update({ full_name: fullName, phone })
+        .update({ full_name: fullName.trim(), phone: phone.trim() })
         .eq('id', profile.id)
 
       if (profileErr) throw profileErr
 
-      // 2. تحديث كلمة المرور إذا قام أدخل كلمة جديدة
+      // 2. تحديث كلمة المرور إذا قام بإدخال كلمة جديدة
       if (newPassword.trim()) {
         const { error: pwdErr } = await supabase.auth.updateUser({
           password: newPassword.trim(),
@@ -89,6 +96,7 @@ export default function Profile() {
             className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none" 
             value={fullName} 
             onChange={(e) => setFullName(e.target.value)} 
+            placeholder="Enter your real name (e.g. Mohamed Ahmed)"
             required 
           />
         </div>
