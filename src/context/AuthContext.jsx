@@ -25,8 +25,8 @@ export function AuthProvider({ children }) {
       // استخراج واختيار أفضل اسم متاح
       let rawName = data?.full_name || data?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'User'
       
-      // لو الاسم عبارة عن كود وظيفي (يبدأ بـ emp أو EMP)، نقوم بتنظيفه واستبداله بجزء من الإيميل أو اسم افتراضي لطيف
-      if (rawName.toLowerCase().startsWith('emp')) {
+      // لو الاسم يحتوي على كلمة emp أو مكتوب ككود وظيفي، يتم استبداله بالإيميل فوراً
+      if (!rawName || rawName.toLowerCase().includes('emp')) {
         rawName = user.email?.split('@')[0] || 'User'
       }
 
