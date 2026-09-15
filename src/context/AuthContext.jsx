@@ -32,7 +32,7 @@ export function AuthProvider({ children }) {
       console.error(err)
       setProfile(null)
     } finally {
-      setLoading(false) // تضمن إن الـ loading يقف تماماً في كل الأحوال
+      setLoading(false)
     }
   }, [])
 
