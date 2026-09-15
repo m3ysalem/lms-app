@@ -52,20 +52,55 @@ export default function Employees() {
 
       const finalPassword = form.password || 'Password123!'
 
-      // استدعاء دالة الأدمن في قاعدة البيانات (تنشئ الحساب بالخلفية بأمان تان دون أي تأثير على جلسة الأدمن)
-      const { error: rpcError } = await supabase.rpc('admin_create_employee', {
-        p_email: finalEmail,
-        p_password: finalPassword,
-        p_employee_id: form.employee_id.trim(),
-        p_full_name: form.full_name,
-        p_role: form.role,
-        p_phone: form.phone || null,
-        p_department_id: form.department_id || null,
-        p_job_title_id: form.job_title_id || null,
-        p_hire_date: form.hire_date || null
+      // 1. حفظ جلسة الأدمن الحالي قبل أي خطوة
+      const { data: { session: adminSession } } = await supabase.auth.getSession()
+
+      // 2. إنشاء المستخدم الجديد بالطريقة الرسمية السليمة من Supabase
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: finalEmail,
+        password: finalPassword,
+        options: {
+          data: {
+            employee_id: form.employee_id.trim(),
+            full_name: form.full_name
+          }
+        }
       })
 
-      if (rpcError) throw rpcError
+      if (authError) throw authError
+
+      const userId = authData.user?.id
+      if (!userId) {
+        throw new Error('Failed to create authentication user ID.')
+      }
+
+      // 3. إدخال البروفايل في جدول public.profiles
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert([
+          {
+            id: userId,
+            employee_id: form.employee_id.trim(),
+            full_name: form.full_name,
+            phone: form.phone || null,
+            email: finalEmail,
+            role: form.role,
+            department_id: form.department_id || null,
+            job_title_id: form.job_title_id || null,
+            hire_date: form.hire_date || null,
+            is_active: true
+          }
+        ])
+
+      if (profileError) throw profileError
+
+      // 4. استعادة جلسة الأدمن فوراً لضمان بقائه في لوحة التحكم
+      if (adminSession) {
+        await supabase.auth.setSession({
+          access_token: adminSession.access_token,
+          refresh_token: adminSession.refresh_token
+        })
+      }
 
       setSaving(false)
       setShowForm(false)
@@ -102,6 +137,10 @@ export default function Employees() {
         const rows = results.data
         const errors = []
         let success = 0
+
+        // حفظ جلسة الأدمن قبل البدء في الـ Loop للرفع الجماعي
+        const { data: { session: adminSession } } = await supabase.auth.getSession()
+
         for (const row of rows) {
           if (!row['Name'] || !row['Employee ID']) {
             errors.push(`Skipped row — missing Name or Employee ID: ${JSON.stringify(row)}`)
@@ -113,25 +152,55 @@ export default function Employees() {
             const rowEmail = row['Email']?.trim() || `emp_${empId}@alesraa.com`
             const rowPassword = row['Password'] || 'Password123!'
 
-            const { error: rpcError } = await supabase.rpc('admin_create_employee', {
-              p_email: rowEmail,
-              p_password: rowPassword,
-              p_employee_id: empId,
-              p_full_name: row['Name'],
-              p_role: row['Role'] || 'employee',
-              p_phone: row['Phone'] || null,
-              p_department_id: null,
-              p_job_title_id: null,
-              p_hire_date: row['Hire Date'] || null
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+              email: rowEmail,
+              password: rowPassword,
+              options: {
+                data: {
+                  employee_id: empId,
+                  full_name: row['Name']
+                }
+              }
             })
 
-            if (rpcError) throw rpcError
+            if (authError) throw authError
+
+            const userId = authData.user?.id
+            if (!userId) throw new Error('Auth ID missing')
+
+            const { error: profileError } = await supabase
+              .from('profiles')
+              .insert([
+                {
+                  id: userId,
+                  employee_id: empId,
+                  full_name: row['Name'],
+                  phone: row['Phone'] || null,
+                  email: rowEmail,
+                  role: row['Role'] || 'employee',
+                  department_id: null,
+                  job_title_id: null,
+                  hire_date: row['Hire Date'] || null,
+                  is_active: true
+                }
+              ])
+
+            if (profileError) throw profileError
 
             success++
           } catch (err) {
             errors.push(`${row['Employee ID']}: ${err.message}`)
           }
         }
+
+        // استعادة جلسة الأدمن بعد انتهاء الـ Loop
+        if (adminSession) {
+          await supabase.auth.setSession({
+            access_token: adminSession.access_token,
+            refresh_token: adminSession.refresh_token
+          })
+        }
+
         setImportResult({ success, errors })
         refresh()
         if (fileRef.current) fileRef.current.value = ''
