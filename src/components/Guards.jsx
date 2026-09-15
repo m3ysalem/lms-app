@@ -6,16 +6,14 @@ import { Spinner } from './Ui'
 export function RequireAuth({ children }) {
   const { session, loading } = useAuth()
   
-  // لو لسه بيحمّل لفترة قصيرة نظهر الـ Spinner، ولو الجلسة موجودة بنعدي فوراً
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-[#0d0f12]">
         <Spinner label="Loading..." />
       </div>
     )
   }
 
-  // لو مفيش جلسة (Session)، يروح فوراً لصفحة تسجيل الدخول بدل التعليق
   if (!session) {
     return <Navigate to="/login" replace />
   }
@@ -28,18 +26,16 @@ export function RequireAdmin({ children }) {
   
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-[#0d0f12]">
         <Spinner />
       </div>
     )
   }
 
-  // لو مفيش جلسة أساساً، رجعه لصفحة تسجيل الدخول
   if (!session) {
     return <Navigate to="/login" replace />
   }
 
-  // لو البروفايل لسه محملش أو الصلاحية مش أدمن، وجهه للرئيسية بدل التعليق
   if (!profile || !['super_admin', 'hr_admin'].includes(profile.role)) {
     return <Navigate to="/" replace />
   }
