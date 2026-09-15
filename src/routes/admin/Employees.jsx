@@ -52,7 +52,7 @@ export default function Employees() {
 
       const finalPassword = form.password || 'Password123!'
 
-      // استدعاء دالة الأدمن في قاعدة البيانات (تنشئ الحساب بالخلفية دون إخراج الأدمن الحالي)
+      // استدعاء دالة الأدمن في قاعدة البيانات (تنشئ الحساب بالخلفية بأمان تان دون أي تأثير على جلسة الأدمن)
       const { error: rpcError } = await supabase.rpc('admin_create_employee', {
         p_email: finalEmail,
         p_password: finalPassword,
