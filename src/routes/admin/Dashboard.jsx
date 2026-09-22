@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
-import { KpiCard, Spinner, Badge, statusTone } from '../../components/Ui'
+import { KpiCard, Spinner, Badge } from '../../components/Ui'
 import { Link } from 'react-router-dom'
 
 const REPORTS_TABS = [
@@ -17,7 +17,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState(null)
   const [overdue, setOverdue] = useState([])
 
-  // حالات قسم التقارير الجديدة
+  // حالات قسم التقارير
   const [activeTab, setActiveTab] = useState('completion')
   const [loadingReport, setLoadingReport] = useState(false)
   const [reportData, setReportData] = useState([])
@@ -62,32 +62,108 @@ export default function AdminDashboard() {
     load()
   }, [])
 
-  // دالة جلب بيانات التقارير حسب التاب النشط
+  // جلب وتجهيز بيانات التقارير بدقة تفصيلية
   const fetchReportData = async (tab) => {
     setLoadingReport(true)
     try {
+      if (tab === 'department') {
+        // جلب الإدارات مع الموظفين والكورسات لحساب الساعات ونسب النجاح لكل إدارة
+        const { data: depts } = await supabase.from('departments').select('id, name')
+        const { data: profiles } = await supabase.from('profiles').select('id, department_id')
+        const { data: courseDepts } = await supabase.from('course_departments').select('department_id, course_id, courses(duration_minutes)')
+        const { data: progress } = await supabase.from('course_progress').select('employee_id, status, progress_percent')
+
+        const deptReport = (depts || []).map(dept => {
+          const deptEmployees = (profiles || []).filter(p => p.department_id === dept.id)
+          const empIds = deptEmployees.map(e => e.id)
+          
+          const deptCourses = (courseDepts || []).filter(cd => cd.department_id === dept.id)
+          const totalHours = deptCourses.reduce((acc, curr) => acc + (curr.courses?.duration_minutes || 0) / 60, 0)
+
+          const empProgress = (progress || []).filter(p => empIds.includes(p.employee_id))
+          const totalAssigned = empProgress.length
+          const completedCount = empProgress.filter(p => p.status === 'completed' || p.progress_percent === 100).length
+          const successRate = totalAssigned > 0 ? Math.round((completedCount / totalAssigned) * 100) : 0
+          const failureRate = totalAssigned > 0 ? 100 - successRate : 0
+
+          return {
+            'Department Name': dept.name,
+            'Total Employees': deptEmployees.length,
+            'Total Courses': deptCourses.length,
+            'Total Training Hours': totalHours.toFixed(1) + ' hrs',
+            'Completed Assignments': completedCount,
+            'Success Rate (%)': successRate + '%',
+            'Incomplete / Failure Rate (%)': failureRate + '%'
+          }
+        })
+        setReportData(deptReport)
+        setLoadingReport(false)
+        return
+      }
+
       let data = []
       if (tab === 'completion') {
-        const { data: res } = await supabase.from('course_progress').select('*, courses(name), profiles(full_name, email)')
-        data = res || []
+        const { data: res } = await supabase.from('course_progress').select('employee_id, course_id, status, progress_percent, courses(name), profiles(full_name, email)')
+        data = (res || []).map(item => ({
+          'Employee Name': item.profiles?.full_name || 'N/A',
+          'Email': item.profiles?.email || 'N/A',
+          'Course Name': item.courses?.name || 'N/A',
+          'Status': item.status || 'In Progress',
+          'Progress (%)': (item.progress_percent || 0) + '%'
+        }))
       } else if (tab === 'employee_history') {
-        const { data: res } = await supabase.from('course_progress').select('*, courses(name, course_code), profiles(full_name, email)')
-        data = res || []
+        const { data: res } = await supabase.from('course_progress').select('employee_id, course_id, status, updated_at, courses(name, course_code), profiles(full_name, email)')
+        data = (res || []).map(item => ({
+          'Employee': item.profiles?.full_name || 'N/A',
+          'Course Code': item.courses?.course_code || 'N/A',
+          'Course Name': item.courses?.name || 'N/A',
+          'Current Status': item.status || 'Active',
+          'Last Updated': item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A'
+        }))
       } else if (tab === 'course_performance') {
         const { data: res } = await supabase.from('courses').select('id, name, course_code, status, duration_minutes, passing_score')
-        data = res || []
+        const { data: prog } = await supabase.from('course_progress').select('course_id, status')
+        
+        data = (res || []).map(c => {
+          const cProg = (prog || []).filter(p => p.course_id === c.id)
+          const enrolled = cProg.length
+          const completed = cProg.filter(p => p.status === 'completed').length
+          const passRate = enrolled > 0 ? Math.round((completed / enrolled) * 100) : 0
+          return {
+            'Course Code': c.course_code,
+            'Course Name': c.name,
+            'Status': c.status,
+            'Duration (Mins)': c.duration_minutes,
+            'Total Enrolled': enrolled,
+            'Completed Count': completed,
+            'Success Rate': passRate + '%'
+          }
+        })
       } else if (tab === 'attendance') {
-        const { data: res } = await supabase.from('lesson_progress').select('*, profiles(full_name), lessons(title)')
-        data = res || []
+        const { data: res } = await supabase.from('lesson_progress').select('status, updated_at, profiles(full_name), lessons(title)')
+        data = (res || []).map(item => ({
+          'Employee Name': item.profiles?.full_name || 'N/A',
+          'Lesson Title': item.lessons?.title || 'N/A',
+          'Status': item.status || 'Viewed',
+          'Date Attended': item.updated_at ? new Date(item.updated_at).toLocaleString() : 'N/A'
+        }))
       } else if (tab === 'certificates') {
-        const { data: res } = await supabase.from('certificates').select('*, courses(name), profiles(full_name, email)')
-        data = res || []
-      } else if (tab === 'department') {
-        const { data: res } = await supabase.from('departments').select('id, name')
-        data = res || []
+        const { data: res } = await supabase.from('certificates').select('issued_at, courses(name), profiles(full_name, email)')
+        data = (res || []).map(item => ({
+          'Employee Name': item.profiles?.full_name || 'N/A',
+          'Email': item.profiles?.email || 'N/A',
+          'Course Name': item.courses?.name || 'N/A',
+          'Issue Date': item.issued_at ? new Date(item.issued_at).toLocaleDateString() : 'N/A'
+        }))
       } else if (tab === 'assessment') {
-        const { data: res } = await supabase.from('quiz_attempts').select('*, quizzes(title), profiles(full_name)')
-        data = res || []
+        const { data: res } = await supabase.from('quiz_attempts').select('score, passed, created_at, quizzes(title), profiles(full_name)')
+        data = (res || []).map(item => ({
+          'Employee Name': item.profiles?.full_name || 'N/A',
+          'Quiz Title': item.quizzes?.title || 'N/A',
+          'Score (%)': item.score ?? 'N/A',
+          'Result': item.passed ? 'Passed' : 'Failed',
+          'Attempt Date': item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A'
+        }))
       }
       setReportData(data)
     } catch (err) {
@@ -101,23 +177,20 @@ export default function AdminDashboard() {
     fetchReportData(activeTab)
   }, [activeTab])
 
-  // دالة لتصدير التقرير الحالي إلى ملف Excel شغال ومنسق
+  // تصدير التقرير الحالي لملف Excel (CSV)
   const exportToExcel = () => {
     if (!reportData.length) {
       alert('No data available to export.')
       return
     }
 
-    let csvContent = '\uFEFF' // دعم الحروف العربية في Excel
+    let csvContent = '\uFEFF' // دعم الحروف العربية في إكسيل
     const keys = Object.keys(reportData[0])
     csvContent += keys.join(',') + '\n'
 
     reportData.forEach(row => {
       const values = keys.map(key => {
         let val = row[key]
-        if (typeof val === 'object' && val !== null) {
-          val = val.name || val.full_name || val.title || JSON.stringify(val)
-        }
         return `"${String(val || '').replace(/"/g, '""')}"`
       })
       csvContent += values.join(',') + '\n'
@@ -139,7 +212,7 @@ export default function AdminDashboard() {
     <div className="space-y-8 text-white">
       <div>
         <h1 className="text-3xl font-black font-head tracking-wide text-white">Admin dashboard</h1>
-        <p className="text-gray-400 mt-1 text-sm">Core KPIs & Advanced Training Reports Management.</p>
+        <p className="text-gray-400 mt-1 text-sm">Core KPIs & Detailed Analytics & Reports.</p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -166,10 +239,10 @@ export default function AdminDashboard() {
         </Link>
       </div>
 
-      {/* قسم التقارير المتقدمة والتابات وزر تصدير الاكسيل */}
+      {/* قسم التقارير المتقدمة والتابات وتصدير الاكسيل */}
       <section className="space-y-4 pt-4 border-t border-white/10">
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <h2 className="font-head font-bold text-xl text-white">Advanced Training Reports</h2>
+          <h2 className="font-head font-bold text-xl text-white">Advanced Detailed Reports</h2>
           <button
             onClick={exportToExcel}
             className="px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-teal-500 text-white font-medium text-sm shadow-lg hover:opacity-90 transition-opacity flex items-center gap-2"
@@ -178,7 +251,7 @@ export default function AdminDashboard() {
           </button>
         </div>
 
-        {/* التابات الشيك */}
+        {/* التابات */}
         <div className="flex gap-2 overflow-x-auto pb-2 border-b border-white/10">
           {REPORTS_TABS.map((tab) => (
             <button
@@ -195,7 +268,7 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        {/* عرض بيانات التقرير */}
+        {/* عرض جدول بيانات التقرير */}
         <div className="p-5 rounded-2xl bg-[#14181d]/85 border border-white/10 backdrop-blur-xl shadow-xl">
           {loadingReport ? (
             <div className="py-12 flex justify-center"><Spinner /></div>
@@ -206,25 +279,19 @@ export default function AdminDashboard() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-white/10 text-xs text-gray-400 uppercase tracking-wider">
-                    {Object.keys(reportData[0]).slice(0, 6).map((key) => (
-                      <th key={key} className="p-3">{key.replace('_', ' ')}</th>
+                    {Object.keys(reportData[0]).map((key) => (
+                      <th key={key} className="p-3">{key}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 text-sm text-gray-300">
                   {reportData.map((row, idx) => (
                     <tr key={idx} className="hover:bg-white/5 transition-colors">
-                      {Object.keys(reportData[0]).slice(0, 6).map((key) => {
-                        let val = row[key]
-                        if (typeof val === 'object' && val !== null) {
-                          val = val.name || val.full_name || val.title || JSON.stringify(val)
-                        }
-                        return (
-                          <td key={key} className="p-3 truncate max-w-xs">
-                            {String(val ?? '')}
-                          </td>
-                        )
-                      })}
+                      {Object.keys(reportData[0]).map((key) => (
+                        <td key={key} className="p-3 truncate max-w-xs">
+                          {String(row[key] ?? '')}
+                        </td>
+                      ))}
                     </tr>
                   ))}
                 </tbody>
