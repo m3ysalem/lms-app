@@ -72,12 +72,13 @@ export default function Dashboard() {
   const overdue = assignments.filter((a) => a?.status !== 'completed' && a?.due_date && new Date(a.due_date) < new Date())
   const totalHours = Object.values(progressMap).reduce((sum, p) => sum + (p?.time_spent_seconds || 0), 0) / 3600
 
-  const userName = profile?.name || profile?.full_name || 'User'
+  // استخدام كود الموظف مباشرة في رسالة الترحيب لتبدو أكثر أناقة
+  const displayName = profile?.employee_id || profile?.name || profile?.full_name || 'User'
 
   return (
     <div className="space-y-8 text-white">
       <div>
-        <h1 className="text-3xl font-black font-head tracking-wide text-white">Welcome back, {userName.split(' ')[0]}</h1>
+        <h1 className="text-3xl font-black font-head tracking-wide text-white">Welcome back, {displayName}</h1>
         <p className="text-gray-400 mt-1 text-sm">Here's where your training stands today.</p>
       </div>
 
