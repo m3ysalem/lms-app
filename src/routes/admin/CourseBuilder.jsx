@@ -107,7 +107,7 @@ export default function CourseBuilder() {
     try {
       setUploadingFile(true)
       const fileExt = file.name.split('.').pop()
-      const fileName = `${Date.now()}_${Math.random().toString(36.substring(2)}.${fileExt}`
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`
       const filePath = `${courseId}/${fileName}`
 
       // رفع الملف إلى Bucket اسمها 'course-files' (تأكد من إنشائها في Supabase Storage كـ Public)
