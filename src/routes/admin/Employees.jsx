@@ -134,20 +134,25 @@ export default function Employees() {
     refresh()
   }
 
-  // الدالة الجديدة المضافة بحذر لشحن زرار الحذف
+  // تم تحديث دالة الحذف لتحاول مسح المستخدم من الـ Auth عبر دالة RPC أو الحذف المباشر المتاح
   const deleteEmployee = async (emp) => {
     if (!window.confirm(`Are you sure you want to delete employee: ${emp.full_name}?`)) {
       return
     }
 
     try {
-      // حذف السجل من جدول profiles بناءً على الـ id
-      const { error } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', emp.id)
+      // 1. محاولة حذف المستخدم من جدول auth باستخدام دالة RPC (إذا كنت قد أنشأتها في قاعدة البيانات) أو الحذف من البروفايل
+      const { error: rpcError } = await supabase.rpc('delete_user_by_id', { target_user_id: emp.id })
+      
+      // لو مفيش RPC مخصص، نقوم بالحذف المباشر من جدول profiles (والذي سيمنع ظهوره في اللوحة)
+      if (rpcError) {
+        const { error } = await supabase
+          .from('profiles')
+          .delete()
+          .eq('id', emp.id)
 
-      if (error) throw error
+        if (error) throw error
+      }
 
       // تحديث القائمة بعد الحذف بنجاح
       refresh()
@@ -378,7 +383,7 @@ export default function Employees() {
                   <button className="text-danger text-xs hover:underline" onClick={() => toggleActive(e)}>
                     {e.is_active ? 'Deactivate' : 'Reactivate'}
                   </button>
-                  {/* زرار الحذف الجديد */}
+                  {/* زرار الحذف */}
                   <button className="text-red-600 text-xs hover:underline font-semibold" onClick={() => deleteEmployee(e)}>
                     Delete
                   </button>
