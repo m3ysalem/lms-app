@@ -72,10 +72,7 @@ export default function Dashboard() {
   const overdue = assignments.filter((a) => a?.status !== 'completed' && a?.due_date && new Date(a.due_date) < new Date())
   const totalHours = Object.values(progressMap).reduce((sum, p) => sum + (p?.time_spent_seconds || 0), 0) / 3600
 
-  // استخدام كود الموظف مباشرة في رسالة الترحيب لتبدو أكثر أناقة
-  const displayName = profile?.employee_id || profile?.name || profile?.full_name || 'User'
-
-// استخدام القيمة من عمود full_name مباشرة دون اقتطاع الاسم الأول
+  // استخدام القيمة من عمود full_name مباشرة دون تكرار
   const displayName = profile?.full_name || 'User'
 
   return (
