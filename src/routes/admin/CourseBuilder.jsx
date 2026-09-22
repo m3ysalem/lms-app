@@ -13,6 +13,7 @@ export default function CourseBuilder() {
   const [selectedDepartmentId, setSelectedDepartmentId] = useState('')
   const [newModuleTitle, setNewModuleTitle] = useState('')
   const [lessonForms, setLessonForms] = useState({})
+  const [uploadingFile, setUploadingFile] = useState(false)
   const [questionForm, setQuestionForm] = useState({ 
     text: '', 
     type: 'multiple_choice', 
@@ -96,6 +97,42 @@ export default function CourseBuilder() {
 
   const updateLessonForm = (moduleId, patch) => {
     setLessonForms((prev) => ({ ...prev, [moduleId]: { ...(prev[moduleId] || { title: '', content_type: 'text', body: '', video_url: '', duration_minutes: 10 }), ...patch } }))
+  }
+
+  // دالة رفع الملف (PDF, Word, Images) إلى Supabase Storage
+  const handleFileUpload = async (moduleId, e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    try {
+      setUploadingFile(true)
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Date.now()}_${Math.random().toString(36.substring(2)}.${fileExt}`
+      const filePath = `${courseId}/${fileName}`
+
+      // رفع الملف إلى Bucket اسمها 'course-files' (تأكد من إنشائها في Supabase Storage كـ Public)
+      const { error: uploadError } = await supabase.storage
+        .from('course-files')
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      // الحصول على الرابط العام للملف المرفوع
+      const { data: publicUrlData } = supabase.storage
+        .from('course-files')
+        .getPublicUrl(filePath)
+
+      const fileUrl = publicUrlData.publicUrl
+
+      // تحديث الـ form بالرابط المباشر للملف في خانة الـ body
+      updateLessonForm(moduleId, { body: fileUrl })
+      alert('File uploaded successfully!')
+    } catch (err) {
+      console.error('Error uploading file:', err)
+      alert('Failed to upload file: ' + err.message)
+    } finally {
+      setUploadingFile(false)
+    }
   }
 
   const createLesson = async (moduleId, sortOrder) => {
@@ -229,9 +266,22 @@ export default function CourseBuilder() {
                 ) : lessonForms[m.id]?.content_type === 'text' ? (
                   <textarea className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none" rows={3} placeholder="Lesson text content" value={lessonForms[m.id]?.body || ''} onChange={(e) => updateLessonForm(m.id, { body: e.target.value })} />
                 ) : (
-                  <p className="text-xs text-gray-400">File upload goes through Supabase Storage.</p>
+                  /* خانة رفع ملفات الـ PDF أو Word أو الصور */
+                  <div className="space-y-2 p-3 rounded-xl bg-black/20 border border-white/10">
+                    <label className="block text-xs font-medium text-gray-300">Upload File (PDF, Word, PPT, Image):</label>
+                    <input 
+                      type="file" 
+                      accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg" 
+                      className="w-full text-xs text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-rose-500/20 file:text-rose-300 hover:file:bg-rose-500/30 cursor-pointer"
+                      onChange={(e) => handleFileUpload(m.id, e)} 
+                    />
+                    {uploadingFile && <p className="text-xs text-yellow-400 animate-pulse">Uploading file to storage...</p>}
+                    {lessonForms[m.id]?.body && (
+                      <p className="text-xs text-green-400 truncate">File ready: {lessonForms[m.id]?.body}</p>
+                    )}
+                  </div>
                 )}
-                <button type="button" className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-medium transition-colors" disabled={busy} onClick={() => createLesson(m.id, m.lessons.length + 1)}>
+                <button type="button" className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-medium transition-colors" disabled={busy || uploadingFile} onClick={() => createLesson(m.id, m.lessons.length + 1)}>
                   Add lesson
                 </button>
               </div>
