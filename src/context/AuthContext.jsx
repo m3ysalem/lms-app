@@ -3,24 +3,15 @@ import { supabase } from '../lib/supabaseClient'
 
 const AuthContext = createContext(null)
 
-// تعديل دالة التنظيف لتعتمد على كود الموظف أو الاسم المتاح بوضوح
+// تعديل دالة التنظيف لتأخذ القيمة من عمود full_name مباشرة دون أي تغيير
 function getCleanName(dbName, email, employeeId) {
-  // لو فيه كود موظف متاح، نخليه هو الأساس للترحيب الأنيق
+  if (dbName) return dbName // لو الاسم موجود في عمود full_name، خده زي ما هو تماماً
+  
+  // الاحتياطيات القديمة في حال كان الحقل فاضي
   if (employeeId) {
     return String(employeeId)
   }
-  if (!dbName) return email?.split('@')[0] || 'User'
-  
-  const lower = dbName.toLowerCase().trim()
-  if (lower.startsWith('emp') || lower.includes('emp_')) {
-    const emailPrefix = email?.split('@')[0]
-    if (emailPrefix && !emailPrefix.toLowerCase().includes('emp')) {
-      return emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1)
-    }
-    return 'Employee'
-  }
-  
-  return dbName
+  return email?.split('@')[0] || 'User'
 }
 
 export function AuthProvider({ children }) {
@@ -45,7 +36,7 @@ export function AuthProvider({ children }) {
       // استخراج كود الموظف من الجدول (سواء كان employee_id أو employee_code)
       const empCode = data?.employee_id || data?.employee_code
 
-      // استخراج الاسم وتطبيق المنطق بحيث يعتمد على كود الموظف ليكون أشيك
+      // استخراج الاسم وتمريره لدالة التنظيف المعدلة ليأخذ full_name كما هو
       const rawDbName = data?.full_name || data?.name || user.user_metadata?.full_name
       const cleanedName = getCleanName(rawDbName, user.email, empCode)
 
