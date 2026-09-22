@@ -149,10 +149,23 @@ export default function CoursePlayer() {
                 </a>
               )}
               {['pdf', 'pptx', 'docx', 'image'].includes(activeLesson.content_type) && (
-                <p className="text-sm text-muted">
-                  Attached material — trainers upload this to Supabase Storage; the app fetches a signed URL
-                  and shows a download/preview link here.
-                </p>
+                <div className="space-y-4">
+                  <p className="text-sm text-muted">
+                    Attached material ({activeLesson.content_type.toUpperCase()}):
+                  </p>
+                  {activeLesson.body ? (
+                    <a
+                      href={activeLesson.body}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal text-white font-medium hover:opacity-90 transition-opacity text-sm"
+                    >
+                      📥 Download / View File →
+                    </a>
+                  ) : (
+                    <p className="text-sm text-red-400">No file attached to this lesson.</p>
+                  )}
+                </div>
               )}
 
               <div className="flex items-center justify-between mt-8 pt-4 border-t border-surface-border">
