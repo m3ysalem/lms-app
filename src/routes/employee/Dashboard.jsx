@@ -75,6 +75,9 @@ export default function Dashboard() {
   // استخدام كود الموظف مباشرة في رسالة الترحيب لتبدو أكثر أناقة
   const displayName = profile?.employee_id || profile?.name || profile?.full_name || 'User'
 
+// استخدام القيمة من عمود full_name مباشرة دون اقتطاع الاسم الأول
+  const displayName = profile?.full_name || 'User'
+
   return (
     <div className="space-y-8 text-white">
       <div>
