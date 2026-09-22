@@ -3,17 +3,6 @@ import { supabase } from '../lib/supabaseClient'
 
 const AuthContext = createContext(null)
 
-// تعديل دالة التنظيف لتأخذ القيمة من عمود full_name مباشرة دون أي تغيير
-function getCleanName(dbName, email, employeeId) {
-  if (dbName) return dbName // لو الاسم موجود في عمود full_name، خده زي ما هو تماماً
-  
-  // الاحتياطيات القديمة في حال كان الحقل فاضي
-  if (employeeId) {
-    return String(employeeId)
-  }
-  return email?.split('@')[0] || 'User'
-}
-
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -33,22 +22,17 @@ export function AuthProvider({ children }) {
         .eq('id', user.id)
         .maybeSingle()
 
-      // استخراج كود الموظف من الجدول (سواء كان employee_id أو employee_code)
-      const empCode = data?.employee_id || data?.employee_code
-
-      // استخراج الاسم وتمريره لدالة التنظيف المعدلة ليأخذ full_name كما هو
-      const rawDbName = data?.full_name || data?.name || user.user_metadata?.full_name
-      const cleanedName = getCleanName(rawDbName, user.email, empCode)
-
       if (error || !data) {
+        // لو مفيش بروفايل، ننشئ كائن افتراضي بالاسم من الإيميل
         data = {
           id: user.id,
           email: user.email,
-          full_name: cleanedName,
+          full_name: user.email?.split('@')[0] || 'User',
           role: 'employee',
         }
       } else {
-        data.full_name = cleanedName
+        // نضمن تماماً إن الـ full_name ياخد القيمة اللي راجعة من العمود الحقيقي في الجدول
+        data.full_name = data.full_name || user.email?.split('@')[0] || 'User'
       }
 
       setProfile(data)
@@ -57,7 +41,7 @@ export function AuthProvider({ children }) {
       setProfile({
         id: user.id,
         email: user.email,
-        full_name: getCleanName(null, user.email, null),
+        full_name: user.email?.split('@')[0] || 'User',
         role: 'employee',
       })
     } finally {
