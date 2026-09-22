@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import Papa from 'papaparse'
 import { supabase } from '../../lib/supabaseClient'
-import { listEmployees, listDepartments, listJobTitles, updateEmployee } from '../../lib/api'
+import { listEmployees, updateEmployee } from '../../lib/api'
 import { Badge, Spinner } from '../../components/Ui'
 
 const emptyForm = { 
@@ -10,16 +10,37 @@ const emptyForm = {
   phone: '', 
   email: '', 
   role: 'employee', 
-  department_id: '', 
-  job_title_id: '', 
+  department: '', 
+  job_title: '', 
   hire_date: '', 
   password: 'Password123!' 
 }
 
+const DEPARTMENTS_LIST = [
+  'Promotion',
+  'Finance',
+  'Sales & Distribution',
+  'HR',
+  'Supply Chain',
+  'Registration',
+  'IT',
+  'Commercial & Compliance',
+  'Marketing & Business Development',
+  'R&D',
+  'Management',
+  'QA',
+  'Production',
+  'Pharmacovigilance',
+  'Engineering',
+  'Events & Conferences',
+  'QC',
+  'Odoo',
+  'New Products On-Boarding',
+  'Digital Marketing'
+]
+
 export default function Employees() {
   const [employees, setEmployees] = useState(null)
-  const [departments, setDepartments] = useState([])
-  const [jobTitles, setJobTitles] = useState([])
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(emptyForm)
@@ -31,10 +52,6 @@ export default function Employees() {
   const refresh = () => listEmployees({ search }).then(setEmployees)
 
   useEffect(() => { refresh() }, [search]) // eslint-disable-line
-  useEffect(() => {
-    listDepartments().then(setDepartments)
-    listJobTitles().then(setJobTitles)
-  }, [])
 
   const createEmployee = async (e) => {
     e.preventDefault()
@@ -85,8 +102,8 @@ export default function Employees() {
             phone: form.phone || null,
             email: finalEmail,
             role: form.role,
-            department_id: form.department_id || null,
-            job_title_id: form.job_title_id || null,
+            department: form.department || null,
+            job_title: form.job_title || null,
             hire_date: form.hire_date || null,
             is_active: true
           }
@@ -200,8 +217,8 @@ export default function Employees() {
                   phone: row['Phone'] || null,
                   email: rowEmail,
                   role: row['Role'] || 'employee',
-                  department_id: null,
-                  job_title_id: null,
+                  department: row['Department'] || null,
+                  job_title: row['Job Title'] || null,
                   hire_date: row['Hire Date'] || null,
                   is_active: true
                 }
@@ -307,17 +324,14 @@ export default function Employees() {
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="label">Department / الإدارة</label>
-              <select className="input" value={form.department_id} onChange={(e) => setForm({ ...form, department_id: e.target.value })}>
+              <select className="input" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })}>
                 <option value="">— Select —</option>
-                {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                {DEPARTMENTS_LIST.map((dept) => <option key={dept} value={dept}>{dept}</option>)}
               </select>
             </div>
             <div>
               <label className="label">Job Title / المسمى الوظيفي</label>
-              <select className="input" value={form.job_title_id} onChange={(e) => setForm({ ...form, job_title_id: e.target.value })}>
-                <option value="">— Select —</option>
-                {jobTitles.map((j) => <option key={j.id} value={j.id}>{j.title}</option>)}
-              </select>
+              <input className="input" type="text" placeholder="e.g. Software Engineer" value={form.job_title} onChange={(e) => setForm({ ...form, job_title: e.target.value })} />
             </div>
             <div>
               <label className="label">Hire Date / تاريخ التعيين</label>
@@ -353,8 +367,8 @@ export default function Employees() {
                   <p className="text-xs text-muted">ID: {e.employee_id || '—'} {e.email && !e.email.startsWith('emp_') ? `· ${e.email}` : ''}</p>
                 </td>
                 <td className="px-4 py-2 text-xs">{e.phone || '—'}</td>
-                <td className="px-4 py-2">{e.department?.name || '—'}</td>
-                <td className="px-4 py-2">{e.job_title?.title || 'Name'}</td>
+                <td className="px-4 py-2">{e.department || e.department?.name || '—'}</td>
+                <td className="px-4 py-2">{e.job_title || '—'}</td>
                 <td className="px-4 py-2"><Badge>{e.role.replace('_', ' ')}</Badge></td>
                 <td className="px-4 py-2">
                   <Badge tone={e.is_active ? 'success' : 'danger'}>{e.is_active ? 'Active' : 'Inactive'}</Badge>
