@@ -3,9 +3,24 @@ import { supabase } from '../../lib/supabaseClient'
 import { KpiCard, Spinner, Badge, statusTone } from '../../components/Ui'
 import { Link } from 'react-router-dom'
 
+const REPORTS_TABS = [
+  { id: 'completion', label: 'Training Completion Rate' },
+  { id: 'employee_history', label: 'Employee History' },
+  { id: 'course_performance', label: 'Course Performance' },
+  { id: 'attendance', label: 'Attendance' },
+  { id: 'certificates', label: 'Certificates' },
+  { id: 'department', label: 'Department Report' },
+  { id: 'assessment', label: 'Assessment Report' },
+]
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null)
   const [overdue, setOverdue] = useState([])
+
+  // حالات قسم التقارير الجديدة
+  const [activeTab, setActiveTab] = useState('completion')
+  const [loadingReport, setLoadingReport] = useState(false)
+  const [reportData, setReportData] = useState([])
 
   useEffect(() => {
     async function load() {
@@ -47,13 +62,84 @@ export default function AdminDashboard() {
     load()
   }, [])
 
+  // دالة جلب بيانات التقارير حسب التاب النشط
+  const fetchReportData = async (tab) => {
+    setLoadingReport(true)
+    try {
+      let data = []
+      if (tab === 'completion') {
+        const { data: res } = await supabase.from('course_progress').select('*, courses(name), profiles(full_name, email)')
+        data = res || []
+      } else if (tab === 'employee_history') {
+        const { data: res } = await supabase.from('course_progress').select('*, courses(name, course_code), profiles(full_name, email)')
+        data = res || []
+      } else if (tab === 'course_performance') {
+        const { data: res } = await supabase.from('courses').select('id, name, course_code, status, duration_minutes, passing_score')
+        data = res || []
+      } else if (tab === 'attendance') {
+        const { data: res } = await supabase.from('lesson_progress').select('*, profiles(full_name), lessons(title)')
+        data = res || []
+      } else if (tab === 'certificates') {
+        const { data: res } = await supabase.from('certificates').select('*, courses(name), profiles(full_name, email)')
+        data = res || []
+      } else if (tab === 'department') {
+        const { data: res } = await supabase.from('departments').select('id, name')
+        data = res || []
+      } else if (tab === 'assessment') {
+        const { data: res } = await supabase.from('quiz_attempts').select('*, quizzes(title), profiles(full_name)')
+        data = res || []
+      }
+      setReportData(data)
+    } catch (err) {
+      console.error('Error fetching report:', err)
+    } finally {
+      setLoadingReport(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchReportData(activeTab)
+  }, [activeTab])
+
+  // دالة لتصدير التقرير الحالي إلى ملف Excel شغال ومنسق
+  const exportToExcel = () => {
+    if (!reportData.length) {
+      alert('No data available to export.')
+      return
+    }
+
+    let csvContent = '\uFEFF' // دعم الحروف العربية في Excel
+    const keys = Object.keys(reportData[0])
+    csvContent += keys.join(',') + '\n'
+
+    reportData.forEach(row => {
+      const values = keys.map(key => {
+        let val = row[key]
+        if (typeof val === 'object' && val !== null) {
+          val = val.name || val.full_name || val.title || JSON.stringify(val)
+        }
+        return `"${String(val || '').replace(/"/g, '""')}"`
+      })
+      csvContent += values.join(',') + '\n'
+    })
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.setAttribute('href', url)
+    link.setAttribute('download', `${activeTab}_report_${new Date().toISOString().slice(0, 10)}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   if (!stats) return <Spinner />
 
   return (
     <div className="space-y-8 text-white">
       <div>
         <h1 className="text-3xl font-black font-head tracking-wide text-white">Admin dashboard</h1>
-        <p className="text-gray-400 mt-1 text-sm">Core KPIs — the full analytics dashboard (charts, training matrix, department breakdowns) ships in Phase 2.</p>
+        <p className="text-gray-400 mt-1 text-sm">Core KPIs & Advanced Training Reports Management.</p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -79,6 +165,74 @@ export default function AdminDashboard() {
           <p className="text-sm text-gray-400 mt-1">Assign courses to individuals, groups or departments.</p>
         </Link>
       </div>
+
+      {/* قسم التقارير المتقدمة والتابات وزر تصدير الاكسيل */}
+      <section className="space-y-4 pt-4 border-t border-white/10">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <h2 className="font-head font-bold text-xl text-white">Advanced Training Reports</h2>
+          <button
+            onClick={exportToExcel}
+            className="px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-teal-500 text-white font-medium text-sm shadow-lg hover:opacity-90 transition-opacity flex items-center gap-2"
+          >
+            📥 Export Current Report to Excel
+          </button>
+        </div>
+
+        {/* التابات الشيك */}
+        <div className="flex gap-2 overflow-x-auto pb-2 border-b border-white/10">
+          {REPORTS_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-rose-600 text-white shadow-md'
+                  : 'bg-black/40 text-gray-400 hover:bg-white/10 hover:text-white'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* عرض بيانات التقرير */}
+        <div className="p-5 rounded-2xl bg-[#14181d]/85 border border-white/10 backdrop-blur-xl shadow-xl">
+          {loadingReport ? (
+            <div className="py-12 flex justify-center"><Spinner /></div>
+          ) : reportData.length === 0 ? (
+            <p className="text-gray-400 text-center py-8">No records found for this report.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-white/10 text-xs text-gray-400 uppercase tracking-wider">
+                    {Object.keys(reportData[0]).slice(0, 6).map((key) => (
+                      <th key={key} className="p-3">{key.replace('_', ' ')}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 text-sm text-gray-300">
+                  {reportData.map((row, idx) => (
+                    <tr key={idx} className="hover:bg-white/5 transition-colors">
+                      {Object.keys(reportData[0]).slice(0, 6).map((key) => {
+                        let val = row[key]
+                        if (typeof val === 'object' && val !== null) {
+                          val = val.name || val.full_name || val.title || JSON.stringify(val)
+                        }
+                        return (
+                          <td key={key} className="p-3 truncate max-w-xs">
+                            {String(val ?? '')}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
 
       <section>
         <h2 className="font-head font-bold text-lg mb-3 text-white">Overdue training</h2>
