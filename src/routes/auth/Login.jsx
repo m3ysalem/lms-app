@@ -61,9 +61,7 @@ export default function Login() {
   }
 
   return (
-    {/* تم تغيير justify-center إلى justify-end px-8 لجعل المربع على اليمين مع ترك مسافة أنيقة */}
     <div className="min-h-screen relative flex items-center justify-end px-8 lg:px-20 overflow-hidden bg-[#0d0f12]">
-      {/* خلفية صورة المصنع مع حركة الزوم والروشانة */}
       <div 
         className="absolute inset-0 bg-cover bg-center"
         style={{ 
@@ -72,13 +70,11 @@ export default function Login() {
         }}
       />
 
-      {/* طبقة عتمة وبلو أنيق وموزون */}
       <div className="absolute inset-0 bg-[#0d0f12]/50 backdrop-blur-[4px]" />
       
       <div className="absolute -top-32 -left-32 w-96 h-96 bg-[#9E1B1B]/35 rounded-full blur-[130px] pointer-events-none" />
       <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-rose-950/45 rounded-full blur-[130px] pointer-events-none" />
 
-      {/* كود الحركة الروشة للزوم */}
       <style>{`
         @keyframes coolZoomEffect {
           0% { transform: scale(1) rotate(0deg); }
