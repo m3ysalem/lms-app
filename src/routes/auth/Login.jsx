@@ -62,27 +62,30 @@ export default function Login() {
 
   return (
     <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-[#0d0f12]">
-      {/* خلفية فيديو متحركة للمصنع مع تأثير الزوم الخفيف */}
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover animate-pulse duration-[10000ms] scale-105 transform hover:scale-100 transition-transform"
-        style={{ animationDuration: '15s' }}
-      >
-        <source src="/factory-bg.mp4" type="video/mp4" />
-        {/* بديل في حال لم يدعم المتصفح الفيديو، تظهر صورة المصنع الثابتة */}
-        Your browser does not support the video tag.
-      </video>
+      {/* خلفية صورة المصنع مع حركة زوم إن وزوم أوت جذابة بالـ CSS */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center transition-transform duration-10000 animate-pulse"
+        style={{ 
+          backgroundImage: `url('/company-bg.jpg')`,
+          animation: 'zoomEffect 20s infinite alternate'
+        }}
+      />
 
-      {/* طبقة عتمة خفيفة جداً مع تقليل البلو عشان تفاصيل الفيديو تبان بوضوح وجاذبية */}
-      <div className="absolute inset-0 bg-[#0d0f12]/50 backdrop-blur-[2px]" />
+      {/* طبقة عتمة خفيفة مع تقليل البلو عشان تفاصيل المصنع تظهر بوضوح */}
+      <div className="absolute inset-0 bg-[#0d0f12]/40 backdrop-blur-[1px]" />
       
       <div className="absolute -top-32 -left-32 w-96 h-96 bg-[#9E1B1B]/30 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-rose-950/40 rounded-full blur-[120px] pointer-events-none" />
 
-      <div className="relative z-10 w-full max-w-lg mx-4 p-8 sm:p-12 rounded-[2.5rem] bg-[#14181d]/85 border border-white/15 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-md text-white">
+      {/* تعريف حركة الزوم للـ CSS */}
+      <style>{`
+        @keyframes zoomEffect {
+          0% { transform: scale(1); }
+          100% { transform: scale(1.1); }
+        }
+      `}</style>
+
+      <div className="relative z-10 w-full max-w-lg mx-4 p-8 sm:p-12 rounded-[2.5rem] bg-[#14181d]/90 border border-white/15 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-md text-white">
         <div className="text-center flex flex-col items-center mb-8">
           <div className="p-5 rounded-2xl shadow-2xl border border-gray-200 mb-4 flex items-center justify-center" style={{ backgroundColor: '#ffffff' }}>
             <img src="/logo.png" alt="ALESRAA PHARMACEUTICALS" className="h-10 w-auto object-contain" onError={(e) => { e.target.style.display = 'none' }} />
