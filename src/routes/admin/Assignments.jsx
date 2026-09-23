@@ -13,7 +13,7 @@ export default function Assignments() {
   const [courseId, setCourseId] = useState('')
   const [mode, setMode] = useState('individual') // individual | department | all
   const [selectedEmployees, setSelectedEmployees] = useState(new Set())
-  const [departmentId, setDepartmentId] = useState('')
+  const [departmentName, setDepartmentName] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [mandatory, setMandatory] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -43,7 +43,7 @@ export default function Assignments() {
     setMessage('')
     let targetIds = []
     if (mode === 'individual') targetIds = Array.from(selectedEmployees)
-    else if (mode === 'department') targetIds = employees.filter((emp) => emp.department_id === departmentId).map((e) => e.id)
+    else if (mode === 'department') targetIds = employees.filter((emp) => emp.department === departmentName).map((e) => e.id)
     else targetIds = employees.filter((e) => e.role === 'employee').map((e) => e.id)
 
     if (targetIds.length === 0) {
@@ -61,8 +61,8 @@ export default function Assignments() {
 
   if (!assignments) return <Spinner />
 
-  // عمل خريطة للأقسام لسهولة عرض اسم القسم بجانب الموظف بدقة
-  const deptMap = departments.reduce((acc, d) => ({ ...acc, [d.id]: d.name }), {})
+  // استخراج الأقسام الفريدة المتاحة في جدول الموظفين لعرضها في القائمة بدقة
+  const uniqueDepartments = Array.from(new Set(employees.map(e => e.department).filter(Boolean)))
 
   return (
     <div className="space-y-8">
@@ -99,16 +99,16 @@ export default function Assignments() {
               <label key={emp.id} className="flex items-center gap-2 text-sm px-1 py-0.5 cursor-pointer">
                 <input type="checkbox" checked={selectedEmployees.has(emp.id)} onChange={() => toggleEmployee(emp.id)} />
                 <span className="font-medium text-white">{emp.full_name || emp.email}</span> 
-                <span className="text-muted">· {deptMap[emp.department_id] || 'No Department'}</span>
+                <span className="text-muted">· {emp.department || 'No Department'}</span>
               </label>
             ))}
           </div>
         )}
 
         {mode === 'department' && (
-          <select className="input" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
+          <select className="input" value={departmentName} onChange={(e) => setDepartmentName(e.target.value)}>
             <option value="">Select department…</option>
-            {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            {uniqueDepartments.map((dept) => <option key={dept} value={dept}>{dept}</option>)}
           </select>
         )}
 
@@ -136,6 +136,7 @@ export default function Assignments() {
             <thead className="bg-surface text-left text-muted">
               <tr>
                 <th className="px-4 py-2 font-medium">Employee</th>
+                <th className="px-4 py-2 font-medium">Department</th>
                 <th className="px-4 py-2 font-medium">Course</th>
                 <th className="px-4 py-2 font-medium">Due date</th>
                 <th className="px-4 py-2 font-medium">Status</th>
@@ -145,6 +146,7 @@ export default function Assignments() {
               {assignments.map((a) => (
                 <tr key={a.id}>
                   <td className="px-4 py-2 font-medium text-white">{a.employee?.full_name || a.employee?.email || '—'}</td>
+                  <td className="px-4 py-2 text-muted">{a.employee?.department || '—'}</td>
                   <td className="px-4 py-2">{a.course?.name || '—'}</td>
                   <td className="px-4 py-2">{a.due_date || '—'}</td>
                   <td className="px-4 py-2"><Badge tone={statusTone(a.status)}>{a.status ? a.status.replace('_', ' ') : 'assigned'}</Badge></td>
