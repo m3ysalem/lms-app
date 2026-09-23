@@ -103,7 +103,7 @@ export default function Login() {
               type="text"
               required
               className="w-full px-4 py-3.5 rounded-xl bg-[#0d0f12]/70 border border-white/15 text-white placeholder-gray-500 focus:outline-none focus:border-[#9E1B1B] focus:ring-1 focus:ring-[#9E1B1B] transition-all text-sm"
-              placeholder="e.g. 1003 or admin@alesraa.net"
+              placeholder="Employee Code"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -116,7 +116,7 @@ export default function Login() {
               type="password"
               required
               className="w-full px-4 py-3.5 rounded-xl bg-[#0d0f12]/70 border border-white/15 text-white placeholder-gray-500 focus:outline-none focus:border-[#9E1B1B] focus:ring-1 focus:ring-[#9E1B1B] transition-all text-sm"
-              placeholder="••••••••"
+              placeholder="Employee Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
