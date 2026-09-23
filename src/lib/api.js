@@ -416,3 +416,17 @@ export async function assignCourse({ courseId, employeeIds, assignedBy, dueDate,
   const { error } = await supabase.from('course_assignments').upsert(rows, { onConflict: 'course_id,employee_id', ignoreDuplicates: true })
   if (error) throw error
 }
+
+// ---------- Admin: list assignments ----------
+export async function listAssignments() {
+  try {
+    const { data, error } = await supabase
+      .from('course_assignments')
+      .select('*, course:courses(name), employee:profiles(full_name, email)')
+    if (error) throw error
+    return data || []
+  } catch (err) {
+    console.error('listAssignments error:', err)
+    return []
+  }
+}
