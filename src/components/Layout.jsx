@@ -63,11 +63,6 @@ export default function Layout({ children }) {
             />
           </div>
         </div>
-        
-            <p className="font-head font-extrabold text-base leading-tight tracking-wide text-white">Al-Esraa</p>
-            <p className="text-[10px] text-rose-400 font-bold tracking-widest uppercase mt-0.5">Optima</p>
-          </div>
-        </div>
 
         <nav className="flex-1 py-6 px-3 space-y-1.5 overflow-y-auto">
           {nav.map((item) => (
