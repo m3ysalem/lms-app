@@ -61,8 +61,9 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-[#0d0f12]">
-      {/* خلفية صورة المصنع مع حركة زوم روشة وسلسة */}
+    {/* تم تغيير justify-center إلى justify-end px-8 لجعل المربع على اليمين مع ترك مسافة أنيقة */}
+    <div className="min-h-screen relative flex items-center justify-end px-8 lg:px-20 overflow-hidden bg-[#0d0f12]">
+      {/* خلفية صورة المصنع مع حركة الزوم والروشانة */}
       <div 
         className="absolute inset-0 bg-cover bg-center"
         style={{ 
@@ -85,7 +86,7 @@ export default function Login() {
         }
       `}</style>
 
-      <div className="relative z-10 w-full max-w-lg mx-4 p-8 sm:p-12 rounded-[2.5rem] bg-[#14181d]/90 border border-white/15 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-md text-white">
+      <div className="relative z-10 w-full max-w-lg p-8 sm:p-12 rounded-[2.5rem] bg-[#14181d]/90 border border-white/15 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-md text-white">
         <div className="text-center flex flex-col items-center mb-8">
           <div className="p-5 rounded-2xl shadow-2xl border border-gray-200 mb-4 flex items-center justify-center" style={{ backgroundColor: '#ffffff' }}>
             <img src="/logo.png" alt="ALESRAA PHARMACEUTICALS" className="h-10 w-auto object-contain" onError={(e) => { e.target.style.display = 'none' }} />
