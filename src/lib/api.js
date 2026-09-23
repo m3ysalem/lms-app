@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient'
 
+// ---------- Employee: assignments & progress ----------
 export async function getMyAssignments(employeeId) {
   try {
     const { data: assignments, error } = await supabase
@@ -11,7 +12,7 @@ export async function getMyAssignments(employeeId) {
 
     if (!assignments || assignments.length === 0) return []
 
-    // جلب جميع الكورسات دفعة واحدة لتفادي أي أخطاء في علاقات الـ Foreign Key
+    // جلب جميع الكورسات دفعة واحدة لتفادي أي أخطاء في علاقات الـ Foreign Key وإظهار الأسماء الحقيقية
     const { data: courses } = await supabase.from('courses').select('id, name, duration')
     const courseMap = (courses || []).reduce((acc, c) => ({ ...acc, [c.id]: c }), {})
 
@@ -417,3 +418,15 @@ export async function assignCourse({ courseId, employeeIds, assignedBy, dueDate,
   if (error) throw error
 }
 
+export async function listAssignments() {
+  try {
+    const { data, error } = await supabase
+      .from('course_assignments')
+      .select('*, course:courses(name), employee:profiles(full_name, email)')
+    if (error) throw error
+    return data || []
+  } catch (err) {
+    console.error('listAssignments error:', err)
+    return []
+  }
+}
