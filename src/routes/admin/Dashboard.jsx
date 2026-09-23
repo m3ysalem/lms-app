@@ -72,7 +72,7 @@ export default function AdminDashboard() {
   const fetchReportData = async (tab) => {
     setLoadingReport(true)
     try {
-      // جلب الجداول الأساسية مع التركيز على profiles لجميع البيانات الوصفية للموظف والادارة
+      // جلب الجداول الأساسية
       const [
         { data: progData }, 
         { data: coursesData }, 
@@ -100,23 +100,16 @@ export default function AdminDashboard() {
 
       let data = []
 
-if (tab === 'department') {
-        const [{ data: profiles }, { data: coursesList }, { data: progress }] = await Promise.all([
-          supabase.from('profiles').select('id, department'),
-          supabase.from('courses').select('id, duration'),
-          supabase.from('course_progress').select('employee_id, course_id, status, progress_percent')
-        ])
+      if (tab === 'department') {
+        const uniqueDepts = [...new Set((profilesData || []).map(p => p.department).filter(Boolean))]
 
-        const uniqueDepts = [...new Set((profiles || []).map(p => p.department).filter(Boolean))]
-        const coursesMap = Object.fromEntries((coursesList || []).map(c => [c.id, c]))
-
-        const deptReport = uniqueDepts.map(deptName => {
-          const deptEmployees = (profiles || []).filter(p => p.department === deptName)
+        data = uniqueDepts.map(deptName => {
+          const deptEmployees = (profilesData || []).filter(p => p.department === deptName)
           const empIds = deptEmployees.map(e => e.id)
           
-          const empProgress = (progress || []).filter(p => empIds.includes(p.employee_id))
+          const empProgress = (progData || []).filter(p => empIds.includes(p.employee_id))
           
-          // تصفية التقدم المكتمل فقط وحساب مجموع مدة كورساتهم بالدقائق ثم تحويلها لساعات
+          // تصفية الكورسات المكتملة فقط لكل موظف داخل القسم وحساب إجمالي الدقائق وتحويلها لساعات
           const completedProgress = empProgress.filter(p => p.status === 'completed' || p.progress_percent === 100)
           const totalMinutes = completedProgress.reduce((acc, curr) => {
             const course = coursesMap[curr.course_id] || {}
@@ -133,19 +126,14 @@ if (tab === 'department') {
           return {
             'Department Name': deptName,
             'Total Employees': deptEmployees.length,
-            'Total Courses': (coursesList || []).length,
+            'Total Courses': (coursesData || []).length,
             'Total Training Hours': totalHours.toFixed(1) + ' hrs',
             'Completed Assignments': completedCount,
             'Success Rate (%)': successRate + '%',
             'Incomplete / Failure Rate (%)': failureRate + '%'
           }
         })
-
-        setReportData(deptReport)
-        setLoadingReport(false)
-        return
-      }
-    } else if (tab === 'completion') {
+      } else if (tab === 'completion') {
         data = (progData || []).map(item => {
           const course = coursesMap[item.course_id] || {}
           const profile = profilesMap[item.employee_id] || {}
