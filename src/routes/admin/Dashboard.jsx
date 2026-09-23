@@ -68,48 +68,21 @@ export default function AdminDashboard() {
     load()
   }, [])
 
-  // جلب وتجهيز بيانات التقارير بدقة تفصيلية متوافقة مع قاعدة البيانات
+  // جلب وتجهيز بيانات التقارير بالاعتماد الكامل على جدول profiles
   const fetchReportData = async (tab) => {
     setLoadingReport(true)
     try {
-      if (tab === 'department') {
-        const [{ data: depts }, { data: profiles }, { data: coursesList }, { data: progress }] = await Promise.all([
-          supabase.from('departments').select('id, name'),
-          supabase.from('profiles').select('id, department_id'),
-          supabase.from('courses').select('id, duration, department_id'),
-          supabase.from('course_progress').select('employee_id, course_id, status, progress_percent')
-        ])
-
-        const deptReport = (depts || []).map(dept => {
-          const deptEmployees = (profiles || []).filter(p => p.department_id === dept.id)
-          const empIds = deptEmployees.map(e => e.id)
-          
-          const deptCourses = (coursesList || []).filter(c => c.department_id === dept.id || !c.department_id)
-          const totalHours = deptCourses.reduce((acc, curr) => acc + (curr.duration || 0) / 60, 0)
-
-          const empProgress = (progress || []).filter(p => empIds.includes(p.employee_id))
-          const totalAssigned = empProgress.length
-          const completedCount = empProgress.filter(p => p.status === 'completed' || p.progress_percent === 100).length
-          const successRate = totalAssigned > 0 ? Math.round((completedCount / totalAssigned) * 100) : 0
-          const failureRate = totalAssigned > 0 ? 100 - successRate : 0
-
-          return {
-            'Department Name': dept.name,
-            'Total Employees': deptEmployees.length,
-            'Total Courses': deptCourses.length,
-            'Total Training Hours': totalHours.toFixed(1) + ' hrs',
-            'Completed Assignments': completedCount,
-            'Success Rate (%)': successRate + '%',
-            'Incomplete / Failure Rate (%)': failureRate + '%'
-          }
-        })
-        setReportData(deptReport)
-        setLoadingReport(false)
-        return
-      }
-
-      // جلب الجداول الأساسية مستقلة لضمان جلب البيانات بغض النظر عن قيود العلاقات
-      const [{ data: progData }, { data: coursesData }, { data: profilesData }, { data: lessonsData }, { data: lessonProgData }, { data: certsData }, { data: quizAttData }, { data: quizzesData }] = await Promise.all([
+      // جلب الجداول الأساسية مع التركيز على profiles لجميع البيانات الوصفية للموظف والادارة
+      const [
+        { data: progData }, 
+        { data: coursesData }, 
+        { data: profilesData }, 
+        { data: lessonsData }, 
+        { data: lessonProgData }, 
+        { data: certsData }, 
+        { data: quizAttData }, 
+        { data: quizzesData }
+      ] = await Promise.all([
         supabase.from('course_progress').select('*'),
         supabase.from('courses').select('*'),
         supabase.from('profiles').select('*'),
@@ -126,13 +99,40 @@ export default function AdminDashboard() {
       const quizzesMap = Object.fromEntries((quizzesData || []).map(q => [q.id, q]))
 
       let data = []
-      if (tab === 'completion') {
+
+      if (tab === 'department') {
+        // استخراج الأقسام الفريدة المكتوبة مباشرة في حقل department بجدول profiles
+        const uniqueDepts = [...new Set((profilesData || []).map(p => p.department).filter(Boolean))]
+
+        data = uniqueDepts.map(deptName => {
+          const deptEmployees = (profilesData || []).filter(p => p.department === deptName)
+          const empIds = deptEmployees.map(e => e.id)
+          
+          const totalHours = (coursesData || []).reduce((acc, curr) => acc + (curr.duration || 0) / 60, 0)
+
+          const empProgress = (progData || []).filter(p => empIds.includes(p.employee_id))
+          const totalAssigned = empProgress.length
+          const completedCount = empProgress.filter(p => p.status === 'completed' || p.progress_percent === 100).length
+          const successRate = totalAssigned > 0 ? Math.round((completedCount / totalAssigned) * 100) : 0
+          const failureRate = totalAssigned > 0 ? 100 - successRate : 0
+
+          return {
+            'Department Name': deptName,
+            'Total Employees': deptEmployees.length,
+            'Total Courses': (coursesData || []).length,
+            'Total Training Hours': totalHours.toFixed(1) + ' hrs',
+            'Completed Assignments': completedCount,
+            'Success Rate (%)': successRate + '%',
+            'Incomplete / Failure Rate (%)': failureRate + '%'
+          }
+        })
+      } else if (tab === 'completion') {
         data = (progData || []).map(item => {
           const course = coursesMap[item.course_id] || {}
           const profile = profilesMap[item.employee_id] || {}
           return {
             'Employee Name': profile.full_name || profile.email || 'N/A',
-            'Email': profile.email || 'N/A',
+            'Department': profile.department || 'N/A',
             'Course Name': course.name || 'N/A',
             'Status': item.status || 'In Progress',
             'Progress (%)': (item.progress_percent || 0) + '%'
@@ -144,6 +144,7 @@ export default function AdminDashboard() {
           const profile = profilesMap[item.employee_id] || {}
           return {
             'Employee': profile.full_name || 'N/A',
+            'Department': profile.department || 'N/A',
             'Course Code': course.id ? course.id.substring(0, 8) : 'N/A',
             'Course Name': course.name || 'N/A',
             'Current Status': item.status || 'Active',
@@ -172,6 +173,7 @@ export default function AdminDashboard() {
           const profile = profilesMap[item.employee_id] || {}
           return {
             'Employee Name': profile.full_name || 'N/A',
+            'Department': profile.department || 'N/A',
             'Lesson Title': lesson.title || 'N/A',
             'Status': item.status || 'Viewed',
             'Date Attended': item.updated_at ? new Date(item.updated_at).toLocaleString() : 'N/A'
@@ -183,7 +185,7 @@ export default function AdminDashboard() {
           const profile = profilesMap[item.employee_id] || {}
           return {
             'Employee Name': profile.full_name || 'N/A',
-            'Email': profile.email || 'N/A',
+            'Department': profile.department || 'N/A',
             'Course Name': course.name || 'N/A',
             'Issue Date': item.issued_at ? new Date(item.issued_at).toLocaleDateString() : 'N/A'
           }
@@ -194,6 +196,7 @@ export default function AdminDashboard() {
           const profile = profilesMap[item.employee_id] || {}
           return {
             'Employee Name': profile.full_name || 'N/A',
+            'Department': profile.department || 'N/A',
             'Quiz Title': quiz.title || 'N/A',
             'Score (%)': item.score ?? 'N/A',
             'Result': item.passed ? 'Passed' : 'Failed',
@@ -201,6 +204,7 @@ export default function AdminDashboard() {
           }
         })
       }
+
       setReportData(data)
     } catch (err) {
       console.error('Error fetching report:', err)
@@ -221,7 +225,7 @@ export default function AdminDashboard() {
       return
     }
 
-    let csvContent = '\uFEFF' // دعم الحروف العربية في إكسيل
+    let csvContent = '\uFEFF'
     const keys = Object.keys(reportData[0])
     csvContent += keys.join(',') + '\n'
 
@@ -276,7 +280,7 @@ export default function AdminDashboard() {
         </Link>
       </div>
 
-      {/* قسم التقارير المتقدمة والتابات وتصدير الاكسيل */}
+      {/* قسم التقارير المتقدمة */}
       <section className="space-y-4 pt-4 border-t border-white/10">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <h2 className="font-head font-bold text-xl text-white">Advanced Detailed Reports</h2>
@@ -305,7 +309,7 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        {/* عرض جدول بيانات التقرير */}
+        {/* جدول عرض التقارير */}
         <div className="p-5 rounded-2xl bg-[#14181d]/85 border border-white/10 backdrop-blur-xl shadow-xl">
           {loadingReport ? (
             <div className="py-12 flex justify-center"><Spinner /></div>
