@@ -93,12 +93,11 @@ export default function Login() {
 
         <div className="mb-6 text-center">
           <h2 className="font-head text-2xl font-black text-white mb-1">Welcome Back</h2>
-          <p className="text-xs text-gray-300">Enter your credentials to access your portal</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold tracking-wider text-gray-200 uppercase mb-1.5" htmlFor="email">Employee ID or Email</label>
+            <label className="block text-xs font-semibold tracking-wider text-gray-200 uppercase mb-1.5" htmlFor="email">Employee ID</label>
             <input
               id="email"
               type="text"
@@ -141,7 +140,7 @@ export default function Login() {
         </form>
 
         <div className="text-center mt-6 pt-5 border-t border-white/10 text-[11px] text-gray-400 flex justify-between items-center">
-          <span>Default Password: <strong className="text-white font-mono">Password123!</strong></span>
+          <span>Default Password: <strong className="text-white font-mono">123456</strong></span>
           <span>© {new Date().getFullYear()} ALESRAA</span>
         </div>
       </div>
