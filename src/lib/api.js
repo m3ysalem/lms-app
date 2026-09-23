@@ -417,16 +417,24 @@ export async function assignCourse({ courseId, employeeIds, assignedBy, dueDate,
   if (error) throw error
 }
 
-// ---------- Admin: list assignments ----------
-export async function listAssignments() {
+export async function getMyAssignments(employeeId) {
   try {
-    const { data, error } = await supabase
+    const { data: assignments, error } = await supabase
       .from('course_assignments')
-      .select('*, course:courses(name), employee:profiles(full_name, email)')
+      .select('*, course:courses(id, name, duration)')
+      .eq('employee_id', employeeId)
+
     if (error) throw error
-    return data || []
+
+    if (!assignments || assignments.length === 0) return []
+
+    // تنسيق البيانات للتأكد من أن حقل course يحتوي على الكائن الصحيح بالاسم
+    return assignments.map(a => ({
+      ...a,
+      course: a.course || { name: 'Unknown Course' }
+    }))
   } catch (err) {
-    console.error('listAssignments error:', err)
+    console.error('getMyAssignments error:', err)
     return []
   }
 }
