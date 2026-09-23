@@ -69,7 +69,7 @@ export default function Login() {
 
       <div className="relative z-10 w-full max-w-lg mx-4 p-8 sm:p-12 rounded-[2.5rem] bg-[#14181d]/90 border border-white/10 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl text-white">
         <div className="text-center flex flex-col items-center mb-8">
-          <div className="px-6 py-3.5 rounded-2xl shadow-2xl border border-white/20 mb-4 flex items-center justify-center bg-white">
+          <div className="bg-white p-5 rounded-2xl shadow-2xl border border-white/20 mb-4 flex items-center justify-center">
             <img src="/logo.png" alt="ALESRAA PHARMACEUTICALS" className="h-10 w-auto object-contain" onError={(e) => { e.target.style.display = 'none' }} />
           </div>
           <span className="font-head font-black text-xl tracking-wider text-white block mb-1">ALESRAA PHARMACEUTICALS</span>
