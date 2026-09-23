@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { downloadCertificatePdf } from '../../lib/certificate'
 import { Spinner, Badge } from '../../components/Ui'
 import { supabase } from '../../lib/supabaseClient'
+import { upsertCourseProgress } from '../../lib/api'
 
 export default function Quiz() {
   const { courseId } = useParams()
@@ -155,7 +156,7 @@ export default function Quiz() {
     setAnswers(prev => ({ ...prev, [qId]: text }))
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const unanswered = questions.filter(q => {
       const ans = answers[q.id]
       if (!ans) return true
@@ -198,15 +199,35 @@ export default function Quiz() {
 
       setResult({ passed, percentage, score_points: correctScore, total_points: questions.length })
 
-      if (passed) {
+      if (passed && profile?.id && courseId) {
+        // 1. تحديث تقدم الكورس إلى 100% وحالة الـ assignment إلى completed لتظهر في التقارير
+        await upsertCourseProgress(profile.id, courseId, 100)
+
+        const certNum = 'CERT-' + Math.floor(100000 + Math.random() * 900000)
+        const issueDate = new Date().toISOString().split('T')[0]
+
+        // 2. حفظ الشهادة في قاعدة بيانات Supabase لتظهر مباشرة في صفحة الشهادات
+        try {
+          await supabase.from('certificates').upsert({
+            employee_id: profile.id,
+            course_id: courseId,
+            cert_number: certNum,
+            issued_date: issueDate,
+            final_score: percentage,
+            trainer_name: 'مدرب الكورس المعتمد'
+          }, { onConflict: 'employee_id,course_id' })
+        } catch (certErr) {
+          console.warn('Certificate database sync warning:', certErr)
+        }
+
         setCertificate({
-          cert_number: 'CERT-' + Math.floor(100000 + Math.random() * 900000),
-          issued_date: new Date().toISOString().split('T')[0],
+          cert_number: certNum,
+          issued_date: issueDate,
           trainer_name: 'مدرب الكورس المعتمد'
         })
       }
     } catch (e) {
-      setError('حدث خطأ أثناء حساب النتيجة')
+      setError('حدث خطأ أثناء حساب وتخزين النتيجة')
     } finally {
       setSubmitting(false)
     }
@@ -218,7 +239,6 @@ export default function Quiz() {
     <div className="max-w-2xl mx-auto space-y-6 p-4 text-white">
       <Link to={`/courses/${courseId || ''}`} className="text-sm text-teal-400 hover:underline font-bold">← Back to course</Link>
       
-      {/* تم تعديل هذا السطر وإضافة text-white ليظهر العنوان بوضوح */}
       <h1 className="text-2xl font-bold text-white mb-4">
         {quiz?.title || (course?.name ? `الاختبار النهائي — ${course.name}` : 'الاختبار النهائي')}
       </h1>
