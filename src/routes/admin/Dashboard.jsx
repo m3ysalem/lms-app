@@ -68,11 +68,10 @@ export default function AdminDashboard() {
     load()
   }, [])
 
-  // جلب وتجهيز بيانات التقارير بالاعتماد الكامل على جدول profiles
+  // جلب وتجهيز بيانات التقارير
   const fetchReportData = async (tab) => {
     setLoadingReport(true)
     try {
-      // جلب الجداول الأساسية
       const [
         { data: progData }, 
         { data: coursesData }, 
@@ -109,7 +108,7 @@ export default function AdminDashboard() {
           
           const empProgress = (progData || []).filter(p => empIds.includes(p.employee_id))
           
-          // تصفية الكورسات المكتملة أو التي تم إنجازها بناءً على الحالة أو نسبة التقدم
+          // احتساب الكورس كمكتمل إذا كانت الحالة تدل على ذلك أو نسبة التقدم 100%
           const completedProgress = empProgress.filter(p => 
             p.status === 'completed' || 
             p.status === 'Complete' || 
@@ -144,11 +143,15 @@ export default function AdminDashboard() {
         data = (progData || []).map(item => {
           const course = coursesMap[item.course_id] || {}
           const profile = profilesMap[item.employee_id] || {}
+          
+          // إذا كان البروجريس 100%، نجعل الحالة تظهر كـ Completed تلقائياً
+          const isCompleted = Number(item.progress_percent || 0) >= 100 || item.status === 'completed'
+          
           return {
             'Employee Name': profile.full_name || profile.email || 'N/A',
             'Department': profile.department || 'N/A',
             'Course Name': course.name || 'N/A',
-            'Status': item.status || 'In Progress',
+            'Status': isCompleted ? 'Completed' : (item.status || 'In Progress'),
             'Progress (%)': (item.progress_percent || 0) + '%'
           }
         })
@@ -156,12 +159,13 @@ export default function AdminDashboard() {
         data = (progData || []).map(item => {
           const course = coursesMap[item.course_id] || {}
           const profile = profilesMap[item.employee_id] || {}
+          const isCompleted = Number(item.progress_percent || 0) >= 100 || item.status === 'completed'
           return {
             'Employee': profile.full_name || 'N/A',
             'Department': profile.department || 'N/A',
             'Course Code': course.id ? course.id.substring(0, 8) : 'N/A',
             'Course Name': course.name || 'N/A',
-            'Current Status': item.status || 'Active',
+            'Current Status': isCompleted ? 'Completed' : (item.status || 'Active'),
             'Last Updated': item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A'
           }
         })
@@ -169,7 +173,7 @@ export default function AdminDashboard() {
         data = (coursesData || []).map(c => {
           const cProg = (progData || []).filter(p => p.course_id === c.id)
           const enrolled = cProg.length
-          const completed = cProg.filter(p => p.status === 'completed').length
+          const completed = cProg.filter(p => p.status === 'completed' || Number(p.progress_percent) >= 100).length
           const passRate = enrolled > 0 ? Math.round((completed / enrolled) * 100) : 0
           return {
             'Course Code': c.id ? c.id.substring(0, 8) : 'N/A',
