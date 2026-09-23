@@ -61,6 +61,9 @@ export default function Assignments() {
 
   if (!assignments) return <Spinner />
 
+  // عمل خريطة للأقسام لسهولة عرض اسم القسم بجانب الموظف بدقة
+  const deptMap = departments.reduce((acc, d) => ({ ...acc, [d.id]: d.name }), {})
+
   return (
     <div className="space-y-8">
       <div>
@@ -93,9 +96,10 @@ export default function Assignments() {
         {mode === 'individual' && (
           <div className="max-h-48 overflow-y-auto border border-surface-border rounded p-2 space-y-1">
             {employees.filter((e) => e.role === 'employee').map((emp) => (
-              <label key={emp.id} className="flex items-center gap-2 text-sm px-1 py-0.5">
+              <label key={emp.id} className="flex items-center gap-2 text-sm px-1 py-0.5 cursor-pointer">
                 <input type="checkbox" checked={selectedEmployees.has(emp.id)} onChange={() => toggleEmployee(emp.id)} />
-                {emp.full_name} <span className="text-muted">· {emp.department?.name}</span>
+                <span className="font-medium text-white">{emp.full_name || emp.email}</span> 
+                <span className="text-muted">· {deptMap[emp.department_id] || 'No Department'}</span>
               </label>
             ))}
           </div>
@@ -114,7 +118,7 @@ export default function Assignments() {
             <input className="input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           </div>
           <div className="flex items-end pb-2">
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input type="checkbox" checked={mandatory} onChange={(e) => setMandatory(e.target.checked)} />
               Mandatory
             </label>
@@ -140,10 +144,10 @@ export default function Assignments() {
             <tbody className="divide-y divide-surface-border">
               {assignments.map((a) => (
                 <tr key={a.id}>
-                  <td className="px-4 py-2">{a.employee?.full_name}</td>
-                  <td className="px-4 py-2">{a.course?.name}</td>
+                  <td className="px-4 py-2 font-medium text-white">{a.employee?.full_name || a.employee?.email || '—'}</td>
+                  <td className="px-4 py-2">{a.course?.name || '—'}</td>
                   <td className="px-4 py-2">{a.due_date || '—'}</td>
-                  <td className="px-4 py-2"><Badge tone={statusTone(a.status)}>{a.status.replace('_', ' ')}</Badge></td>
+                  <td className="px-4 py-2"><Badge tone={statusTone(a.status)}>{a.status ? a.status.replace('_', ' ') : 'assigned'}</Badge></td>
                 </tr>
               ))}
             </tbody>
