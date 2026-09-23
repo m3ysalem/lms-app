@@ -48,21 +48,22 @@ export default function Layout({ children }) {
       {/* Dark Overlay with proper contrast */}
       <div className="absolute inset-0 bg-[#0d0f12]/90 backdrop-blur-md pointer-events-none fixed" />
 
-      {/* Desktop sidebar */}
+     {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-[#14181d]/95 text-white shrink-0 shadow-2xl border-r border-white/10 relative z-20 backdrop-blur-xl">
-        <div className="px-6 py-6 border-b border-white/10 flex items-center gap-3.5 bg-[#0d0f12]/60">
+        <div className="px-6 py-6 border-b border-white/10 flex items-center justify-center bg-[#0d0f12]/60">
           <div 
-            className="px-3 py-2 rounded-xl shrink-0 shadow-lg border border-white flex items-center justify-center"
+            className="w-full px-4 py-3 rounded-xl shrink-0 shadow-lg border border-white flex items-center justify-center"
             style={{ backgroundColor: '#ffffff', opacity: 1 }}
           >
             <img 
               src="/logo.png" 
               alt="Logo" 
-              className="h-8 w-auto object-contain" 
+              className="w-full h-10 object-contain" 
               onError={(e) => { e.target.parentElement.style.display = 'none' }}
             />
           </div>
-          <div>
+        </div>
+        
             <p className="font-head font-extrabold text-base leading-tight tracking-wide text-white">Al-Esraa</p>
             <p className="text-[10px] text-rose-400 font-bold tracking-widest uppercase mt-0.5">Optima</p>
           </div>
