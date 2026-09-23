@@ -53,32 +53,37 @@ export default function AdminDashboard() {
 
       const { data: overdueDetail } = await supabase
         .from('course_assignments')
-        .select('id, due_date, course:course_id(name), employee:employee_id(full_name)')
+        .select('id, due_date, course_id, employee_id, courses(name), profiles(full_name)')
         .neq('status', 'completed')
         .lt('due_date', new Date().toISOString().slice(0, 10))
         .limit(8)
-      setOverdue(overdueDetail || [])
+      
+      const formattedOverdue = (overdueDetail || []).map(o => ({
+        ...o,
+        course: o.courses || { name: 'N/A' },
+        employee: o.profiles || { full_name: 'N/A' }
+      }))
+      setOverdue(formattedOverdue)
     }
     load()
   }, [])
 
-  // جلب وتجهيز بيانات التقارير بدقة تفصيلية
+  // جلب وتجهيز بيانات التقارير بدقة تفصيلية متوافقة مع قاعدة البيانات
   const fetchReportData = async (tab) => {
     setLoadingReport(true)
     try {
       if (tab === 'department') {
-        // جلب الإدارات مع الموظفين والكورسات لحساب الساعات ونسب النجاح لكل إدارة
         const { data: depts } = await supabase.from('departments').select('id, name')
         const { data: profiles } = await supabase.from('profiles').select('id, department_id')
-        const { data: courseDepts } = await supabase.from('course_departments').select('department_id, course_id, courses(duration_minutes)')
-        const { data: progress } = await supabase.from('course_progress').select('employee_id, status, progress_percent')
+        const { data: coursesList } = await supabase.from('courses').select('id, duration, department_id')
+        const { data: progress } = await supabase.from('course_progress').select('employee_id, course_id, status, progress_percent')
 
         const deptReport = (depts || []).map(dept => {
           const deptEmployees = (profiles || []).filter(p => p.department_id === dept.id)
           const empIds = deptEmployees.map(e => e.id)
           
-          const deptCourses = (courseDepts || []).filter(cd => cd.department_id === dept.id)
-          const totalHours = deptCourses.reduce((acc, curr) => acc + (curr.courses?.duration_minutes || 0) / 60, 0)
+          const deptCourses = (coursesList || []).filter(c => c.department_id === dept.id || !c.department_id)
+          const totalHours = deptCourses.reduce((acc, curr) => acc + (curr.duration || 0) / 60, 0)
 
           const empProgress = (progress || []).filter(p => empIds.includes(p.employee_id))
           const totalAssigned = empProgress.length
@@ -112,16 +117,16 @@ export default function AdminDashboard() {
           'Progress (%)': (item.progress_percent || 0) + '%'
         }))
       } else if (tab === 'employee_history') {
-        const { data: res } = await supabase.from('course_progress').select('employee_id, course_id, status, updated_at, courses(name, course_code), profiles(full_name, email)')
+        const { data: res } = await supabase.from('course_progress').select('employee_id, course_id, status, updated_at, courses(name, id), profiles(full_name, email)')
         data = (res || []).map(item => ({
           'Employee': item.profiles?.full_name || 'N/A',
-          'Course Code': item.courses?.course_code || 'N/A',
+          'Course Code': item.courses?.id ? item.courses.id.substring(0, 8) : 'N/A',
           'Course Name': item.courses?.name || 'N/A',
           'Current Status': item.status || 'Active',
           'Last Updated': item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A'
         }))
       } else if (tab === 'course_performance') {
-        const { data: res } = await supabase.from('courses').select('id, name, course_code, status, duration_minutes, passing_score')
+        const { data: res } = await supabase.from('courses').select('id, name, status, duration, passing_score')
         const { data: prog } = await supabase.from('course_progress').select('course_id, status')
         
         data = (res || []).map(c => {
@@ -130,10 +135,10 @@ export default function AdminDashboard() {
           const completed = cProg.filter(p => p.status === 'completed').length
           const passRate = enrolled > 0 ? Math.round((completed / enrolled) * 100) : 0
           return {
-            'Course Code': c.course_code,
+            'Course Code': c.id ? c.id.substring(0, 8) : 'N/A',
             'Course Name': c.name,
             'Status': c.status,
-            'Duration (Mins)': c.duration_minutes,
+            'Duration (Mins)': c.duration || 0,
             'Total Enrolled': enrolled,
             'Completed Count': completed,
             'Success Rate': passRate + '%'
