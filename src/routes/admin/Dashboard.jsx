@@ -100,33 +100,52 @@ export default function AdminDashboard() {
 
       let data = []
 
-      if (tab === 'department') {
-        // استخراج الأقسام الفريدة المكتوبة مباشرة في حقل department بجدول profiles
-        const uniqueDepts = [...new Set((profilesData || []).map(p => p.department).filter(Boolean))]
+if (tab === 'department') {
+        const [{ data: profiles }, { data: coursesList }, { data: progress }] = await Promise.all([
+          supabase.from('profiles').select('id, department'),
+          supabase.from('courses').select('id, duration'),
+          supabase.from('course_progress').select('employee_id, course_id, status, progress_percent')
+        ])
 
-        data = uniqueDepts.map(deptName => {
-          const deptEmployees = (profilesData || []).filter(p => p.department === deptName)
+        const uniqueDepts = [...new Set((profiles || []).map(p => p.department).filter(Boolean))]
+        const coursesMap = Object.fromEntries((coursesList || []).map(c => [c.id, c]))
+
+        const deptReport = uniqueDepts.map(deptName => {
+          const deptEmployees = (profiles || []).filter(p => p.department === deptName)
           const empIds = deptEmployees.map(e => e.id)
           
-          const totalHours = (coursesData || []).reduce((acc, curr) => acc + (curr.duration || 0) / 60, 0)
+          const empProgress = (progress || []).filter(p => empIds.includes(p.employee_id))
+          
+          // تصفية التقدم المكتمل فقط وحساب مجموع مدة كورساتهم بالدقائق ثم تحويلها لساعات
+          const completedProgress = empProgress.filter(p => p.status === 'completed' || p.progress_percent === 100)
+          const totalMinutes = completedProgress.reduce((acc, curr) => {
+            const course = coursesMap[curr.course_id] || {}
+            return acc + (course.duration || 0)
+          }, 0)
+          
+          const totalHours = totalMinutes / 60
 
-          const empProgress = (progData || []).filter(p => empIds.includes(p.employee_id))
           const totalAssigned = empProgress.length
-          const completedCount = empProgress.filter(p => p.status === 'completed' || p.progress_percent === 100).length
+          const completedCount = completedProgress.length
           const successRate = totalAssigned > 0 ? Math.round((completedCount / totalAssigned) * 100) : 0
           const failureRate = totalAssigned > 0 ? 100 - successRate : 0
 
           return {
             'Department Name': deptName,
             'Total Employees': deptEmployees.length,
-            'Total Courses': (coursesData || []).length,
+            'Total Courses': (coursesList || []).length,
             'Total Training Hours': totalHours.toFixed(1) + ' hrs',
             'Completed Assignments': completedCount,
             'Success Rate (%)': successRate + '%',
             'Incomplete / Failure Rate (%)': failureRate + '%'
           }
         })
-      } else if (tab === 'completion') {
+
+        setReportData(deptReport)
+        setLoadingReport(false)
+        return
+      }
+    } else if (tab === 'completion') {
         data = (progData || []).map(item => {
           const course = coursesMap[item.course_id] || {}
           const profile = profilesMap[item.employee_id] || {}
