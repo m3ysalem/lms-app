@@ -426,9 +426,9 @@ export async function getMyAssignments(employeeId) {
       .eq('employee_id', employeeId)
 
     if (error) throw error
+
     if (!assignments || assignments.length === 0) return []
 
-    // جلب الكورسات المرتبطة بشكل منفصل وآمن لضمان ظهور الاسم دائماً
     const { data: courses } = await supabase.from('courses').select('id, name, duration')
     const courseMap = (courses || []).reduce((acc, c) => ({ ...acc, [c.id]: c }), {})
 
