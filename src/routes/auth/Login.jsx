@@ -69,7 +69,7 @@ export default function Login() {
 
       <div className="relative z-10 w-full max-w-lg mx-4 p-8 sm:p-12 rounded-[2.5rem] bg-[#14181d]/90 border border-white/10 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl text-white">
         <div className="text-center flex flex-col items-center mb-8">
-          <div className="bg-white p-5 rounded-2xl shadow-2xl border border-white/20 mb-4 flex items-center justify-center">
+          <div className="p-5 rounded-2xl shadow-2xl border border-gray-200 mb-4 flex items-center justify-center" style={{ backgroundColor: '#ffffff' }}>
             <img src="/logo.png" alt="ALESRAA PHARMACEUTICALS" className="h-10 w-auto object-contain" onError={(e) => { e.target.style.display = 'none' }} />
           </div>
           <span className="font-head font-black text-xl tracking-wider text-white block mb-1">ALESRAA PHARMACEUTICALS</span>
@@ -126,7 +126,7 @@ export default function Login() {
         </form>
 
         <div className="text-center mt-6 pt-5 border-t border-white/5 text-[11px] text-gray-500 flex justify-between items-center">
-          <span>Default Password: <strong className="text-gray-300 font-mono">Password123!</strong></span>
+          <span>Default Password: <strong className="text-gray-300 font-mono">123456</strong></span>
           <span>© {new Date().getFullYear()} ALESRAA</span>
         </div>
       </div>
