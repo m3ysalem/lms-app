@@ -62,26 +62,26 @@ export default function Login() {
 
   return (
     <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-[#0d0f12]">
-      {/* خلفية صورة المصنع مع حركة زوم إن وزوم أوت جذابة بالـ CSS */}
+      {/* خلفية صورة المصنع مع حركة زوم روشة وسلسة */}
       <div 
-        className="absolute inset-0 bg-cover bg-center transition-transform duration-10000 animate-pulse"
+        className="absolute inset-0 bg-cover bg-center"
         style={{ 
           backgroundImage: `url('/company-bg.jpg')`,
-          animation: 'zoomEffect 20s infinite alternate'
+          animation: 'coolZoomEffect 12s infinite alternate ease-in-out'
         }}
       />
 
-      {/* طبقة عتمة خفيفة مع تقليل البلو عشان تفاصيل المصنع تظهر بوضوح */}
-      <div className="absolute inset-0 bg-[#0d0f12]/40 backdrop-blur-[1px]" />
+      {/* طبقة عتمة وبلو أنيق وموزون */}
+      <div className="absolute inset-0 bg-[#0d0f12]/50 backdrop-blur-[4px]" />
       
-      <div className="absolute -top-32 -left-32 w-96 h-96 bg-[#9E1B1B]/30 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-rose-950/40 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute -top-32 -left-32 w-96 h-96 bg-[#9E1B1B]/35 rounded-full blur-[130px] pointer-events-none" />
+      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-rose-950/45 rounded-full blur-[130px] pointer-events-none" />
 
-      {/* تعريف حركة الزوم للـ CSS */}
+      {/* كود الحركة الروشة للزوم */}
       <style>{`
-        @keyframes zoomEffect {
-          0% { transform: scale(1); }
-          100% { transform: scale(1.1); }
+        @keyframes coolZoomEffect {
+          0% { transform: scale(1) rotate(0deg); }
+          100% { transform: scale(1.12) rotate(0.5deg); }
         }
       `}</style>
 
