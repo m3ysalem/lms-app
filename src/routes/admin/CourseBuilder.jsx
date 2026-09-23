@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
-import { Spinner } from '../../components/Ui'
 
 export default function CreateCourse() {
   const navigate = useNavigate()
@@ -16,14 +15,15 @@ export default function CreateCourse() {
   })
   const [busy, setBusy] = useState(false)
 
-  // جلب الأقسام الفريدة ديناميكياً من عمود department في جدول profiles
+  // جلب الأقسام المرتبطة من جدول departments مباشرة
   useEffect(() => {
     async function fetchDepartments() {
       try {
-        const { data, error } = await supabase.from('profiles').select('department')
+        const { data, error } = await supabase.from('departments').select('id, name')
         if (!error && data) {
-          const uniqueDepts = [...new Set(data.map(p => p.department).filter(Boolean))]
-          setDepartments(uniqueDepts)
+          setDepartments(data)
+        } else {
+          console.error('Error fetching departments:', error)
         }
       } catch (err) {
         console.error('Error fetching departments:', err)
@@ -32,10 +32,10 @@ export default function CreateCourse() {
     fetchDepartments()
   }, [])
 
-  // دالة تحديد أو إلغاء تحديد القسم
-  const handleCheckboxChange = (dept) => {
+  // دالة تحديد أو إلغاء تحديد القسم (تعتمد على الـ id)
+  const handleCheckboxChange = (deptId) => {
     setSelectedDepts(prev => 
-      prev.includes(dept) ? prev.filter(d => d !== dept) : [...prev, dept]
+      prev.includes(deptId) ? prev.filter(id => id !== deptId) : [...prev, deptId]
     )
   }
 
@@ -48,19 +48,37 @@ export default function CreateCourse() {
 
     try {
       setBusy(true)
-      // إرسال البيانات مع الأقسام المستهدفة (selectedDepts)
-      const { error } = await supabase.from('courses').insert([{
-        name: courseData.name,
-        course_code: courseData.course_code,
-        passing_score: Number(courseData.passing_score),
-        certificate_eligible: courseData.certificate_eligible,
-        required: courseData.required,
-        target_departments: selectedDepts // حفظ الأقسام المختارة
-      }])
 
-      if (error) throw error
+      // 1. إدخال الكورس الأساسي
+      const { data: newCourse, error: courseError } = await supabase
+        .from('courses')
+        .insert([{
+          name: courseData.name,
+          course_code: courseData.course_code,
+          passing_score: Number(courseData.passing_score),
+          certificate_eligible: courseData.certificate_eligible,
+          required: courseData.required
+        }])
+        .select()
+        .single()
 
-      alert('Course created successfully!')
+      if (courseError) throw courseError
+
+      // 2. ربط الكورس بالأقسام المستهدفة في الجدول الوسيط course_departments (إذا تم اختيار أقسام)
+      if (selectedDepts.length > 0 && newCourse) {
+        const relations = selectedDepts.map(deptId => ({
+          course_id: newCourse.id,
+          department_id: deptId
+        }))
+
+        const { error: relationError } = await supabase
+          .from('course_departments')
+          .insert(relations)
+
+        if (relationError) throw relationError
+      }
+
+      alert('Course created and departments linked successfully!')
       navigate('/admin/courses')
     } catch (err) {
       alert('Failed to create course: ' + err.message)
@@ -74,7 +92,6 @@ export default function CreateCourse() {
       <h1 className="text-2xl font-bold">Create New Course</h1>
       
       <form onSubmit={handleCreate} className="space-y-6">
-        {/* بيانات الكورس الأساسية */}
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Course Name</label>
@@ -99,7 +116,7 @@ export default function CreateCourse() {
           </div>
         </div>
 
-        {/* الإدارات المستهدفة (Target Departments) ديناميكياً */}
+        {/* الإدارات المستهدفة (Target Departments) ديناميكياً من جدول departments */}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-300">
             Target Departments (الإدارات المستهدفة)
@@ -107,17 +124,17 @@ export default function CreateCourse() {
           
           <div className="p-4 rounded-xl bg-[#14181d]/85 border border-white/10 space-y-3 max-h-48 overflow-y-auto">
             {departments.length === 0 ? (
-              <p className="text-gray-400 text-sm">No departments found in profiles.</p>
+              <p className="text-gray-400 text-sm">No departments found.</p>
             ) : (
-              departments.map((dept, index) => (
-                <label key={index} className="flex items-center gap-3 cursor-pointer text-sm hover:text-white">
+              departments.map((dept) => (
+                <label key={dept.id} className="flex items-center gap-3 cursor-pointer text-sm hover:text-white">
                   <input
                     type="checkbox"
-                    checked={selectedDepts.includes(dept)}
-                    onChange={() => handleCheckboxChange(dept)}
+                    checked={selectedDepts.includes(dept.id)}
+                    onChange={() => handleCheckboxChange(dept.id)}
                     className="rounded border-white/20 bg-black text-rose-600 focus:ring-0 w-4 h-4 cursor-pointer"
                   />
-                  <span>{dept}</span>
+                  <span>{dept.name}</span>
                 </label>
               ))
             )}
