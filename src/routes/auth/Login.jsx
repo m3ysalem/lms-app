@@ -72,8 +72,8 @@ export default function Login() {
           <div className="p-5 rounded-2xl shadow-2xl border border-gray-200 mb-4 flex items-center justify-center" style={{ backgroundColor: '#ffffff' }}>
             <img src="/logo.png" alt="ALESRAA PHARMACEUTICALS" className="h-10 w-auto object-contain" onError={(e) => { e.target.style.display = 'none' }} />
           </div>
-          <span className="font-head font-black text-xl tracking-wider text-white block mb-1">ALESRAA PHARMACEUTICALS</span>
-          <span className="text-xs text-rose-400 font-semibold tracking-[0.25em] uppercase">Optima Learning Management System</span>
+          <span className="font-head font-black text-xl tracking-wider text-white block mb-1">ALESRAA PHARMACEUTICALS Optima</span>
+          <span className="text-xs text-rose-400 font-semibold tracking-[0.25em] uppercase">Learning Management System</span>
         </div>
 
         <div className="mb-6 text-center">
