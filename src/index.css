@@ -8,14 +8,14 @@ html, body, #root {
 
 body {
   font-family: "IBM Plex Sans", sans-serif;
-  color: #111315;
-  background-color: #F8F9FA;
+  color: #ffffff;
+  background-color: #14181d;
   -webkit-font-smoothing: antialiased;
 }
 
 h1, h2, h3, h4 {
   font-family: Manrope, sans-serif;
-  color: #1A1D20;
+  color: #ffffff !important;
 }
 
 ::selection {
@@ -33,9 +33,10 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .card {
-  background-color: #FFFFFF;
-  border: 1px solid #E3E6EC;
+  background-color: #14181d !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
   border-radius: 6px;
+  color: #ffffff !important;
 }
 
 .btn-primary {
@@ -57,9 +58,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .btn-secondary {
-  background-color: #FFFFFF;
-  border: 1px solid #E3E6EC;
-  color: #1A1D20;
+  background-color: #1f2937;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
   padding: 0.5rem 1rem;
   border-radius: 6px;
   font-weight: 500;
@@ -67,7 +68,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .btn-secondary:hover {
-  background-color: #F8F9FA;
+  background-color: #374151;
 }
 
 .btn-secondary:disabled {
@@ -76,16 +77,16 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 
 .input {
   width: 100%;
-  border: 1px solid #E3E6EC;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 6px;
   padding: 0.5rem 0.75rem;
-  background-color: #FFFFFF;
-  color: #111315;
+  background-color: #14181d !important;
+  color: #ffffff !important;
   outline: none;
 }
 
 .input::placeholder {
-  color: #706F6F;
+  color: #9ca3af;
 }
 
 .input:focus {
@@ -95,10 +96,11 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .label {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #26292D;
+  color: #e5e7eb;
   margin-bottom: 0.25rem;
   display: block;
 }
+
 /* Force light cards/boxes to become modern dark glassmorphism across the app */
 .bg-white, [class*="bg-white"] {
   background-color: rgba(20, 24, 29, 0.85) !important;
@@ -117,6 +119,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .text-gray-500, .text-gray-600, .text-gray-700 {
   color: #9ca3af !important;
 }
+
 /* Override all legacy white cards and inputs across the app */
 .card, [class*="card"], .bg-white {
   background-color: #14181d !important;
