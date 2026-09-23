@@ -46,15 +46,18 @@ export default function MyLearning() {
       ) : (
         <div className="space-y-3">
           {filtered.map((a) => {
-            const p = progressMap[a.course.id]
+            const courseId = a.course?.id || a.course_id
+            const courseName = a.course?.name || 'Course'
+            const p = progressMap[courseId]
             const isOverdue = a.status !== 'completed' && a.due_date && new Date(a.due_date) < new Date()
+            
             return (
-              <Link to={`/courses/${a.course.id}`} key={a.id} className="card p-4 flex items-center gap-4 hover:border-teal transition-colors">
+              <Link to={`/courses/${courseId || ''}`} key={a.id} className="card p-4 flex items-center gap-4 hover:border-teal transition-colors">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-medium text-ink-800 truncate">{a.course.name}</p>
+                    <p className="font-medium text-ink-800 truncate">{courseName}</p>
                     {a.is_mandatory && <Badge tone="warning">Mandatory</Badge>}
-                    <Badge tone={isOverdue ? 'danger' : statusTone(a.status)}>{isOverdue ? 'overdue' : a.status.replace('_', ' ')}</Badge>
+                    <Badge tone={isOverdue ? 'danger' : statusTone(a.status)}>{isOverdue ? 'overdue' : (a.status ? a.status.replace('_', ' ') : 'assigned')}</Badge>
                   </div>
                   <p className="text-xs text-muted mt-1">{a.due_date ? `Due ${a.due_date}` : 'No due date'}</p>
                   <div className="mt-2 max-w-xs">
