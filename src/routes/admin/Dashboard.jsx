@@ -109,14 +109,21 @@ export default function AdminDashboard() {
           
           const empProgress = (progData || []).filter(p => empIds.includes(p.employee_id))
           
-          // تصفية الكورسات المكتملة فقط لكل موظف داخل القسم وحساب إجمالي الدقائق وتحويلها لساعات
-          const completedProgress = empProgress.filter(p => p.status === 'completed' || p.progress_percent === 100)
+          // تصفية الكورسات المكتملة أو التي تم إنجازها بناءً على الحالة أو نسبة التقدم
+          const completedProgress = empProgress.filter(p => 
+            p.status === 'completed' || 
+            p.status === 'Complete' || 
+            p.status === 'Finished' || 
+            Number(p.progress_percent) >= 100
+          )
+
           const totalMinutes = completedProgress.reduce((acc, curr) => {
             const course = coursesMap[curr.course_id] || {}
-            return acc + (course.duration || 0)
+            const durationMins = Number(course.duration || course.duration_mins || course.minutes || 0)
+            return acc + durationMins
           }, 0)
-          
-          const totalHours = totalMinutes / 60
+
+          const totalHours = totalMinutes > 0 ? (totalMinutes / 60) : 0
 
           const totalAssigned = empProgress.length
           const completedCount = completedProgress.length
@@ -127,7 +134,7 @@ export default function AdminDashboard() {
             'Department Name': deptName,
             'Total Employees': deptEmployees.length,
             'Total Courses': (coursesData || []).length,
-            'Total Training Hours': totalHours.toFixed(1) + ' hrs',
+            'Total Training Hours': totalHours > 0 ? totalHours.toFixed(1) + ' hrs' : '0.0 hrs',
             'Completed Assignments': completedCount,
             'Success Rate (%)': successRate + '%',
             'Incomplete / Failure Rate (%)': failureRate + '%'
