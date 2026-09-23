@@ -84,7 +84,6 @@ export async function getMyNotifications(employeeId) {
 // ---------- Course catalog & player ----------
 export async function getPublishedCourses(employeeId) {
   try {
-    // 1. جلب قسم الموظف الحالي أولاً للتصفية بدقة
     let userDeptId = null;
     if (employeeId) {
       const { data: profile } = await supabase
@@ -96,13 +95,11 @@ export async function getPublishedCourses(employeeId) {
       userDeptId = profile?.department_id;
     }
 
-    // 2. بناء استعلام الكورسات المنشورة
     let query = supabase
       .from('courses')
       .select('*')
       .eq('status', 'published');
 
-    // 3. تصفية الكورسات: إما مخصصة لقسم الموظف أو عامة (null)
     if (userDeptId) {
       query = query.or(`department_id.eq.${userDeptId},department_id.is.null`);
     } else {
