@@ -419,7 +419,9 @@ export async function assignCourse({ courseId, employeeIds, assignedBy, dueDate,
 }
 
 export async function listAssignments() {
-  const { data, error } = await supabase.from('course_assignments').select('*')
+  const { data, error } = await supabase
+    .from('course_assignments')
+    .select('*, employee:employee_id(id, full_name, email, department), course:course_id(id, name)')
   if (error) throw error
   return data || []
 }
