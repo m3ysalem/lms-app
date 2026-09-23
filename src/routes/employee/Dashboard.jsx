@@ -70,7 +70,14 @@ export default function Dashboard() {
   const inProgress = assignments.filter((a) => a?.status === 'in_progress' || a?.status === 'started' || a?.status === 'assigned')
   const completed = assignments.filter((a) => a?.status === 'completed')
   const overdue = assignments.filter((a) => a?.status !== 'completed' && a?.due_date && new Date(a.due_date) < new Date())
-  const totalHours = Object.values(progressMap).reduce((sum, p) => sum + (p?.time_spent_seconds || 0), 0) / 3600
+  
+  // حساب إجمالي ساعات التدريب بناءً على وقت التقدم المسجل أو مدة الكورسات المكتملة
+  const rawSeconds = Object.values(progressMap).reduce((sum, p) => sum + (p?.time_spent_seconds || 0), 0)
+  const completedCourseHours = completed.reduce((sum, a) => {
+    const courseDuration = a.course?.duration || a.course?.duration_hours || 1
+    return sum + (typeof courseDuration === 'number' ? courseDuration : parseFloat(courseDuration) || 1)
+  }, 0)
+  const totalHours = rawSeconds > 0 ? rawSeconds / 3600 : completedCourseHours
 
   // استخدام القيمة من عمود full_name مباشرة دون تكرار
   const displayName = profile?.full_name || 'User'
