@@ -3,20 +3,22 @@ import { supabase } from './supabaseClient'
 // ---------- Employee: assignments & progress ----------
 export async function getMyAssignments(employeeId) {
   try {
-    const { data, error } = await supabase
+    const { data: assignments, error } = await supabase
       .from('course_assignments')
-      .select('*, course:course_id(*)')
+      .select('*')
       .eq('employee_id', employeeId)
 
-    if (error) {
-      const { data: fallbackData } = await supabase
-        .from('course_assignments')
-        .select('*')
-        .eq('employee_id', employeeId)
-      return fallbackData || []
-    }
+    if (error) throw error
 
-    return data || []
+    if (!assignments || assignments.length === 0) return []
+
+    const { data: courses } = await supabase.from('courses').select('id, name, duration')
+    const courseMap = (courses || []).reduce((acc, c) => ({ ...acc, [c.id]: c }), {})
+
+    return assignments.map(a => ({
+      ...a,
+      course: courseMap[a.course_id] || { name: 'Course Completion' }
+    }))
   } catch (err) {
     console.error('getMyAssignments error:', err)
     return []
@@ -416,28 +418,4 @@ export async function assignCourse({ courseId, employeeIds, assignedBy, dueDate,
   }))
   const { error } = await supabase.from('course_assignments').upsert(rows, { onConflict: 'course_id,employee_id', ignoreDuplicates: true })
   if (error) throw error
-}
-
-export async function getMyAssignments(employeeId) {
-  try {
-    const { data: assignments, error } = await supabase
-      .from('course_assignments')
-      .select('*')
-      .eq('employee_id', employeeId)
-
-    if (error) throw error
-
-    if (!assignments || assignments.length === 0) return []
-
-    const { data: courses } = await supabase.from('courses').select('id, name, duration')
-    const courseMap = (courses || []).reduce((acc, c) => ({ ...acc, [c.id]: c }), {})
-
-    return assignments.map(a => ({
-      ...a,
-      course: courseMap[a.course_id] || { name: 'Course Completion' }
-    }))
-  } catch (err) {
-    console.error('getMyAssignments error:', err)
-    return []
-  }
 }
