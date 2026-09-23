@@ -51,18 +51,17 @@ export async function downloadCertificatePdf(cert) {
     })
   }
 
-  // 2. اسم الكورس (تمت إزالة شرط اللغة العربية ليظهر اسم الكورس الحقيقي مثل HSE3 مباشرة بدون إبداله بكلمة Course Completion)
+  // 2. اسم الكورس (تم رفعه لفوق لتجنب التداخل عن طريق زيادة قيمة الـ y إلى 265)
   if (cert.course_name) {
     const courseSize = 22
     let courseRaw = cert.course_name
     
-    // عرض اسم الكورس الحقيقي مباشرة
     const courseText = courseRaw.toLowerCase().includes('course') ? courseRaw : `${courseRaw} Course`
     const textWidth = font.widthOfTextAtSize(courseText, courseSize)
     
     safeDrawText(courseText, {
       x: 421 - textWidth / 2,
-      y: 230,
+      y: 265,
       size: courseSize,
       font,
       color: navy,
