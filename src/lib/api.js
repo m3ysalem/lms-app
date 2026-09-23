@@ -1,6 +1,5 @@
 import { supabase } from './supabaseClient'
 
-// ---------- Employee: assignments & progress ----------
 export async function getMyAssignments(employeeId) {
   try {
     const { data: assignments, error } = await supabase
@@ -12,12 +11,13 @@ export async function getMyAssignments(employeeId) {
 
     if (!assignments || assignments.length === 0) return []
 
+    // جلب جميع الكورسات دفعة واحدة لتفادي أي أخطاء في علاقات الـ Foreign Key
     const { data: courses } = await supabase.from('courses').select('id, name, duration')
     const courseMap = (courses || []).reduce((acc, c) => ({ ...acc, [c.id]: c }), {})
 
     return assignments.map(a => ({
       ...a,
-      course: courseMap[a.course_id] || { name: 'Course Completion' }
+      course: courseMap[a.course_id] || { name: 'Unknown Course' }
     }))
   } catch (err) {
     console.error('getMyAssignments error:', err)
@@ -417,27 +417,3 @@ export async function assignCourse({ courseId, employeeIds, assignedBy, dueDate,
   if (error) throw error
 }
 
-export async function getMyAssignments(employeeId) {
-  try {
-    const { data: assignments, error } = await supabase
-      .from('course_assignments')
-      .select('*')
-      .eq('employee_id', employeeId)
-
-    if (error) throw error
-
-    if (!assignments || assignments.length === 0) return []
-
-    // جلب جميع الكورسات دفعة واحدة لتفادي أي أخطاء في علاقات الـ Foreign Key
-    const { data: courses } = await supabase.from('courses').select('id, name, duration')
-    const courseMap = (courses || []).reduce((acc, c) => ({ ...acc, [c.id]: c }), {})
-
-    return assignments.map(a => ({
-      ...a,
-      course: courseMap[a.course_id] || { name: 'Unknown Course' }
-    }))
-  } catch (err) {
-    console.error('getMyAssignments error:', err)
-    return []
-  }
-}
