@@ -419,9 +419,29 @@ export async function assignCourse({ courseId, employeeIds, assignedBy, dueDate,
 }
 
 export async function listAssignments() {
-  const { data, error } = await supabase
-    .from('course_assignments')
-    .select('*, employee:employee_id(id, full_name, email, department), course:course_id(id, name)')
-  if (error) throw error
-  return data || []
+  try {
+    const { data: assignments, error } = await supabase
+      .from('course_assignments')
+      .select('*')
+    if (error) throw error
+
+    if (!assignments || assignments.length === 0) return []
+
+    // جلب الموظفين والكورسات بشكل منفصل لضمان عدم حدوث خطأ في العلاقات
+    const { data: profiles } = await supabase.from('profiles').select('id, full_name, email, department')
+    const { data: courses } = await supabase.from('courses').select('id, name')
+
+    const profileMap = (profiles || []).reduce((acc, p) => ({ ...acc, [p.id]: p }), {})
+    const courseMap = (courses || []).reduce((acc, c) => ({ ...acc, [c.id]: c }), {})
+
+    // دمج البيانات معاً بسلاسة
+    return assignments.map(a => ({
+      ...a,
+      employee: profileMap[a.employee_id] || null,
+      course: courseMap[a.course_id] || null,
+    }))
+  } catch (err) {
+    console.error('listAssignments error:', err)
+    return []
+  }
 }
