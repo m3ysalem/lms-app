@@ -73,10 +73,12 @@ export default function AdminDashboard() {
     setLoadingReport(true)
     try {
       if (tab === 'department') {
-        const { data: depts } = await supabase.from('departments').select('id, name')
-        const { data: profiles } = await supabase.from('profiles').select('id, department_id')
-        const { data: coursesList } = await supabase.from('courses').select('id, duration, department_id')
-        const { data: progress } = await supabase.from('course_progress').select('employee_id, course_id, status, progress_percent')
+        const [{ data: depts }, { data: profiles }, { data: coursesList }, { data: progress }] = await Promise.all([
+          supabase.from('departments').select('id, name'),
+          supabase.from('profiles').select('id, department_id'),
+          supabase.from('courses').select('id, duration, department_id'),
+          supabase.from('course_progress').select('employee_id, course_id, status, progress_percent')
+        ])
 
         const deptReport = (depts || []).map(dept => {
           const deptEmployees = (profiles || []).filter(p => p.department_id === dept.id)
@@ -106,38 +108,58 @@ export default function AdminDashboard() {
         return
       }
 
+      // جلب الجداول الأساسية مستقلة لضمان جلب البيانات بغض النظر عن قيود العلاقات
+      const [{ data: progData }, { data: coursesData }, { data: profilesData }, { data: lessonsData }, { data: lessonProgData }, { data: certsData }, { data: quizAttData }, { data: quizzesData }] = await Promise.all([
+        supabase.from('course_progress').select('*'),
+        supabase.from('courses').select('*'),
+        supabase.from('profiles').select('*'),
+        supabase.from('lessons').select('*'),
+        supabase.from('lesson_progress').select('*'),
+        supabase.from('certificates').select('*'),
+        supabase.from('quiz_attempts').select('*'),
+        supabase.from('quizzes').select('*'),
+      ])
+
+      const coursesMap = Object.fromEntries((coursesData || []).map(c => [c.id, c]))
+      const profilesMap = Object.fromEntries((profilesData || []).map(p => [p.id, p]))
+      const lessonsMap = Object.fromEntries((lessonsData || []).map(l => [l.id, l]))
+      const quizzesMap = Object.fromEntries((quizzesData || []).map(q => [q.id, q]))
+
       let data = []
       if (tab === 'completion') {
-        const { data: res } = await supabase.from('course_progress').select('employee_id, course_id, status, progress_percent, courses(name), profiles(full_name, email)')
-        data = (res || []).map(item => ({
-          'Employee Name': item.profiles?.full_name || 'N/A',
-          'Email': item.profiles?.email || 'N/A',
-          'Course Name': item.courses?.name || 'N/A',
-          'Status': item.status || 'In Progress',
-          'Progress (%)': (item.progress_percent || 0) + '%'
-        }))
+        data = (progData || []).map(item => {
+          const course = coursesMap[item.course_id] || {}
+          const profile = profilesMap[item.employee_id] || {}
+          return {
+            'Employee Name': profile.full_name || profile.email || 'N/A',
+            'Email': profile.email || 'N/A',
+            'Course Name': course.name || 'N/A',
+            'Status': item.status || 'In Progress',
+            'Progress (%)': (item.progress_percent || 0) + '%'
+          }
+        })
       } else if (tab === 'employee_history') {
-        const { data: res } = await supabase.from('course_progress').select('employee_id, course_id, status, updated_at, courses(name, id), profiles(full_name, email)')
-        data = (res || []).map(item => ({
-          'Employee': item.profiles?.full_name || 'N/A',
-          'Course Code': item.courses?.id ? item.courses.id.substring(0, 8) : 'N/A',
-          'Course Name': item.courses?.name || 'N/A',
-          'Current Status': item.status || 'Active',
-          'Last Updated': item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A'
-        }))
+        data = (progData || []).map(item => {
+          const course = coursesMap[item.course_id] || {}
+          const profile = profilesMap[item.employee_id] || {}
+          return {
+            'Employee': profile.full_name || 'N/A',
+            'Course Code': course.id ? course.id.substring(0, 8) : 'N/A',
+            'Course Name': course.name || 'N/A',
+            'Current Status': item.status || 'Active',
+            'Last Updated': item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A'
+          }
+        })
       } else if (tab === 'course_performance') {
-        const { data: res } = await supabase.from('courses').select('id, name, status, duration, passing_score')
-        const { data: prog } = await supabase.from('course_progress').select('course_id, status')
-        
-        data = (res || []).map(c => {
-          const cProg = (prog || []).filter(p => p.course_id === c.id)
+        data = (coursesData || []).map(c => {
+          const cProg = (progData || []).filter(p => p.course_id === c.id)
           const enrolled = cProg.length
           const completed = cProg.filter(p => p.status === 'completed').length
           const passRate = enrolled > 0 ? Math.round((completed / enrolled) * 100) : 0
           return {
             'Course Code': c.id ? c.id.substring(0, 8) : 'N/A',
-            'Course Name': c.name,
-            'Status': c.status,
+            'Course Name': c.name || 'N/A',
+            'Status': c.status || 'N/A',
             'Duration (Mins)': c.duration || 0,
             'Total Enrolled': enrolled,
             'Completed Count': completed,
@@ -145,34 +167,44 @@ export default function AdminDashboard() {
           }
         })
       } else if (tab === 'attendance') {
-        const { data: res } = await supabase.from('lesson_progress').select('status, updated_at, profiles(full_name), lessons(title)')
-        data = (res || []).map(item => ({
-          'Employee Name': item.profiles?.full_name || 'N/A',
-          'Lesson Title': item.lessons?.title || 'N/A',
-          'Status': item.status || 'Viewed',
-          'Date Attended': item.updated_at ? new Date(item.updated_at).toLocaleString() : 'N/A'
-        }))
+        data = (lessonProgData || []).map(item => {
+          const lesson = lessonsMap[item.lesson_id] || {}
+          const profile = profilesMap[item.employee_id] || {}
+          return {
+            'Employee Name': profile.full_name || 'N/A',
+            'Lesson Title': lesson.title || 'N/A',
+            'Status': item.status || 'Viewed',
+            'Date Attended': item.updated_at ? new Date(item.updated_at).toLocaleString() : 'N/A'
+          }
+        })
       } else if (tab === 'certificates') {
-        const { data: res } = await supabase.from('certificates').select('issued_at, courses(name), profiles(full_name, email)')
-        data = (res || []).map(item => ({
-          'Employee Name': item.profiles?.full_name || 'N/A',
-          'Email': item.profiles?.email || 'N/A',
-          'Course Name': item.courses?.name || 'N/A',
-          'Issue Date': item.issued_at ? new Date(item.issued_at).toLocaleDateString() : 'N/A'
-        }))
+        data = (certsData || []).map(item => {
+          const course = coursesMap[item.course_id] || {}
+          const profile = profilesMap[item.employee_id] || {}
+          return {
+            'Employee Name': profile.full_name || 'N/A',
+            'Email': profile.email || 'N/A',
+            'Course Name': course.name || 'N/A',
+            'Issue Date': item.issued_at ? new Date(item.issued_at).toLocaleDateString() : 'N/A'
+          }
+        })
       } else if (tab === 'assessment') {
-        const { data: res } = await supabase.from('quiz_attempts').select('score, passed, created_at, quizzes(title), profiles(full_name)')
-        data = (res || []).map(item => ({
-          'Employee Name': item.profiles?.full_name || 'N/A',
-          'Quiz Title': item.quizzes?.title || 'N/A',
-          'Score (%)': item.score ?? 'N/A',
-          'Result': item.passed ? 'Passed' : 'Failed',
-          'Attempt Date': item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A'
-        }))
+        data = (quizAttData || []).map(item => {
+          const quiz = quizzesMap[item.quiz_id] || {}
+          const profile = profilesMap[item.employee_id] || {}
+          return {
+            'Employee Name': profile.full_name || 'N/A',
+            'Quiz Title': quiz.title || 'N/A',
+            'Score (%)': item.score ?? 'N/A',
+            'Result': item.passed ? 'Passed' : 'Failed',
+            'Attempt Date': item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A'
+          }
+        })
       }
       setReportData(data)
     } catch (err) {
       console.error('Error fetching report:', err)
+      setReportData([])
     } finally {
       setLoadingReport(false)
     }
