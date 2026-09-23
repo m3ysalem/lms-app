@@ -5,16 +5,20 @@ export async function getMyAssignments(employeeId) {
   try {
     const { data: assignments, error } = await supabase
       .from('course_assignments')
-      .select('*, course:courses(id, name, duration)')
+      .select('*')
       .eq('employee_id', employeeId)
 
     if (error) throw error
 
     if (!assignments || assignments.length === 0) return []
 
+    // جلب جميع الكورسات دفعة واحدة لتفادي أي أخطاء في علاقات الـ Foreign Key وإظهار الأسماء الحقيقية
+    const { data: courses } = await supabase.from('courses').select('id, name, duration')
+    const courseMap = (courses || []).reduce((acc, c) => ({ ...acc, [c.id]: c }), {})
+
     return assignments.map(a => ({
       ...a,
-      course: a.course || { name: `Course ID: ${a.course_id?.substring(0, 8) || 'N/A'}` }
+      course: courseMap[a.course_id] || { name: 'Unknown Course' }
     }))
   } catch (err) {
     console.error('getMyAssignments error:', err)
