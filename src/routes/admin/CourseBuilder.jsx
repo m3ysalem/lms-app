@@ -23,16 +23,17 @@ export default function CourseBuilder() {
   })
   const [busy, setBusy] = useState(false)
 
-  // جلب الأقسام المتاحة من قاعدة البيانات
+  // جلب الأقسام الفريدة ديناميكياً من عمود department في جدول profiles
   useEffect(() => {
     async function fetchDepartments() {
       try {
-        const { data: deptData, error } = await supabase.from('departments').select('id, name')
-        if (!error && deptData) {
-          setDepartments(deptData)
+        const { data: profilesData, error } = await supabase.from('profiles').select('department')
+        if (!error && profilesData) {
+          const uniqueDepts = [...new Set(profilesData.map(p => p.department).filter(Boolean))]
+          setDepartments(uniqueDepts)
         }
       } catch (err) {
-        console.error('Error fetching departments:', err)
+        console.error('Error fetching departments from profiles:', err)
       }
     }
     fetchDepartments()
@@ -110,21 +111,18 @@ export default function CourseBuilder() {
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`
       const filePath = `${courseId}/${fileName}`
 
-      // رفع الملف إلى Bucket اسمها 'course-files' (تأكد من إنشائها في Supabase Storage كـ Public)
       const { error: uploadError } = await supabase.storage
         .from('course-files')
         .upload(filePath, file)
 
       if (uploadError) throw uploadError
 
-      // الحصول على الرابط العام للملف المرفوع
       const { data: publicUrlData } = supabase.storage
         .from('course-files')
         .getPublicUrl(filePath)
 
       const fileUrl = publicUrlData.publicUrl
 
-      // تحديث الـ form بالرابط المباشر للملف في خانة الـ body
       updateLessonForm(moduleId, { body: fileUrl })
       alert('File uploaded successfully!')
     } catch (err) {
@@ -226,9 +224,9 @@ export default function CourseBuilder() {
           onChange={handleDepartmentChange}
         >
           <option value="">All Departments (عام لكل الإدارات)</option>
-          {departments.map((dept) => (
-            <option key={dept.id} value={dept.id} className="bg-gray-900 text-white">
-              {dept.name}
+          {departments.map((deptName, idx) => (
+            <option key={idx} value={deptName} className="bg-gray-900 text-white">
+              {deptName}
             </option>
           ))}
         </select>
@@ -266,7 +264,6 @@ export default function CourseBuilder() {
                 ) : lessonForms[m.id]?.content_type === 'text' ? (
                   <textarea className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none" rows={3} placeholder="Lesson text content" value={lessonForms[m.id]?.body || ''} onChange={(e) => updateLessonForm(m.id, { body: e.target.value })} />
                 ) : (
-                  /* خانة رفع ملفات الـ PDF أو Word أو الصور */
                   <div className="space-y-2 p-3 rounded-xl bg-black/20 border border-white/10">
                     <label className="block text-xs font-medium text-gray-300">Upload File (PDF, Word, PPT, Image):</label>
                     <input 
