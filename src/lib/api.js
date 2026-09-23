@@ -418,30 +418,26 @@ export async function assignCourse({ courseId, employeeIds, assignedBy, dueDate,
   if (error) throw error
 }
 
-export async function listAssignments() {
+export async function getMyAssignments(employeeId) {
   try {
     const { data: assignments, error } = await supabase
       .from('course_assignments')
       .select('*')
-    if (error) throw error
+      .eq('employee_id', employeeId)
 
+    if (error) throw error
     if (!assignments || assignments.length === 0) return []
 
-    // جلب الموظفين والكورسات بشكل منفصل لضمان عدم حدوث خطأ في العلاقات
-    const { data: profiles } = await supabase.from('profiles').select('id, full_name, email, department')
-    const { data: courses } = await supabase.from('courses').select('id, name')
-
-    const profileMap = (profiles || []).reduce((acc, p) => ({ ...acc, [p.id]: p }), {})
+    // جلب الكورسات المرتبطة بشكل منفصل وآمن لضمان ظهور الاسم دائماً
+    const { data: courses } = await supabase.from('courses').select('id, name, duration')
     const courseMap = (courses || []).reduce((acc, c) => ({ ...acc, [c.id]: c }), {})
 
-    // دمج البيانات معاً بسلاسة
     return assignments.map(a => ({
       ...a,
-      employee: profileMap[a.employee_id] || null,
-      course: courseMap[a.course_id] || null,
+      course: courseMap[a.course_id] || { name: 'Course Completion' }
     }))
   } catch (err) {
-    console.error('listAssignments error:', err)
+    console.error('getMyAssignments error:', err)
     return []
   }
 }
