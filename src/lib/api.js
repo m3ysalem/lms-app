@@ -216,13 +216,31 @@ export async function upsertCourseProgress(employeeId, courseId, percent) {
   const status = percent >= 100 ? 'completed' : percent > 0 ? 'in_progress' : 'assigned'
   
   try {
-    await supabase
+    const { data: existing } = await supabase
       .from('course_assignments')
-      .update({ status })
+      .select('id')
       .eq('course_id', courseId)
       .eq('employee_id', employeeId)
+      .maybeSingle()
+
+    if (existing) {
+      await supabase
+        .from('course_assignments')
+        .update({ status })
+        .eq('course_id', courseId)
+        .eq('employee_id', employeeId)
+    } else {
+      await supabase
+        .from('course_assignments')
+        .insert({
+          course_id: courseId,
+          employee_id: employeeId,
+          status: status,
+          is_mandatory: false
+        })
+    }
   } catch (err) {
-    console.warn('Assignment status update warning:', err)
+    console.warn('Assignment status update/insert warning:', err)
   }
 }
 
