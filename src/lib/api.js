@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient'
 // ---------- Employee: assignments & progress ----------
 export async function getMyAssignments(employeeId) {
   try {
+    // 1. جلب التعيينات الخاصة بالمستخدم
     const { data: assignments, error } = await supabase
       .from('course_assignments')
       .select('*')
@@ -10,16 +11,50 @@ export async function getMyAssignments(employeeId) {
 
     if (error) throw error
 
-    if (!assignments || assignments.length === 0) return []
+    // 2. جلب التقدم الخاص بالمستخدم لضمان ظهور الكورسات التي بدأها من الكتالوج حتى لو لم تُعنَ له
+    const { data: progressList } = await supabase
+      .from('course_progress')
+      .select('*')
+      .eq('employee_id', employeeId)
+
+    const assignedMap = new Map((assignments || []).map(a => [a.course_id, a]))
+    const allCourseIdsSet = new Set([
+      ...(assignments || []).map(a => a.course_id),
+      ...(progressList || []).map(p => p.course_id)
+    ])
+
+    if (allCourseIdsSet.size === 0) return []
 
     // جلب جميع الكورسات دفعة واحدة لتفادي أي أخطاء في علاقات الـ Foreign Key وإظهار الأسماء الحقيقية
     const { data: courses } = await supabase.from('courses').select('id, name, duration')
     const courseMap = (courses || []).reduce((acc, c) => ({ ...acc, [c.id]: c }), {})
 
-    return assignments.map(a => ({
-      ...a,
-      course: courseMap[a.course_id] || { name: 'Unknown Course' }
-    }))
+    // دمج التعيينات والتقدم معاً في قائمة موحدة للموظف
+    const combinedList = Array.from(allCourseIdsSet).map(courseId => {
+      const existingAssignment = assignedMap.get(courseId)
+      const prog = (progressList || []).find(p => p.course_id === courseId)
+
+      if (existingAssignment) {
+        return {
+          ...existingAssignment,
+          course: courseMap[courseId] || { name: 'Unknown Course' }
+        }
+      } else {
+        // إنشاء عنصر افتراضي للكورس الذي بدأه الموظف من الكتالوج ولم يُعنَ له مسبقاً
+        const isCompleted = prog && prog.progress_percent >= 100
+        return {
+          id: `prog-${courseId}`,
+          course_id: courseId,
+          employee_id: employeeId,
+          status: isCompleted ? 'completed' : (prog ? 'in_progress' : 'assigned'),
+          is_mandatory: false,
+          due_date: null,
+          course: courseMap[courseId] || { name: 'Unknown Course' }
+        }
+      }
+    })
+
+    return combinedList
   } catch (err) {
     console.error('getMyAssignments error:', err)
     return []
