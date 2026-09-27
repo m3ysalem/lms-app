@@ -24,16 +24,21 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     async function load() {
+      // جلب البيانات الأساسية مع تصفية الموظفين الحقيقيين فقط
       const [employees, courses, assignments, certificates] = await Promise.all([
         supabase.from('profiles').select('id, is_active, role', { count: 'exact' }),
         supabase.from('courses').select('id, status', { count: 'exact' }),
-        supabase.from('course_assignments').select('id, status, due_date'),
-        supabase.from('certificates').select('id', { count: 'exact' }),
+        supabase.from('course_assignments').select('id, status, due_date, employee_id'),
+        supabase.from('certificates').select('id, employee_id', { count: 'exact' }),
       ])
 
       const employeeRows = employees.data || []
+      const validEmployeeIds = new Set(employeeRows.map(e => e.id))
       const courseRows = courses.data || []
-      const assignmentRows = assignments.data || []
+      
+      // تصفية الواجبات والشهادات لتشمل الموظفين الموجودين فقط في profiles
+      const assignmentRows = (assignments.data || []).filter(a => validEmployeeIds.has(a.employee_id))
+      const validCertificates = (certificates.data || []).filter(c => validEmployeeIds.has(c.employee_id))
 
       const today = new Date()
       const overdueRows = assignmentRows.filter((a) => a.status !== 'completed' && a.due_date && new Date(a.due_date) < today)
@@ -48,9 +53,10 @@ export default function AdminDashboard() {
         completed,
         completionRate: assignmentRows.length ? Math.round((completed / assignmentRows.length) * 100) : 0,
         overdueCount: overdueRows.length,
-        certificates: certificates.count ?? 0,
+        certificates: validCertificates.length,
       })
 
+      // جلب المتأخرات مع التأكد من وجود الموظف والكورس بشكل سليم
       const { data: overdueDetail } = await supabase
         .from('course_assignments')
         .select('id, due_date, course_id, employee_id, courses(name), profiles(full_name)')
@@ -58,33 +64,35 @@ export default function AdminDashboard() {
         .lt('due_date', new Date().toISOString().slice(0, 10))
         .limit(8)
       
-      const formattedOverdue = (overdueDetail || []).map(o => ({
-        ...o,
-        course: o.courses || { name: 'N/A' },
-        employee: o.profiles || { full_name: 'N/A' }
-      }))
+      const formattedOverdue = (overdueDetail || [])
+        .filter(o => o.profiles && validEmployeeIds.has(o.employee_id))
+        .map(o => ({
+          ...o,
+          course: o.courses || { name: 'N/A' },
+          employee: o.profiles || { full_name: 'N/A' }
+        }))
       setOverdue(formattedOverdue)
     }
     load()
   }, [])
 
-  // جلب وتجهيز بيانات التقارير
+  // جلب وتجهيز بيانات التقارير بشكل دقيق ومفلتر
   const fetchReportData = async (tab) => {
     setLoadingReport(true)
     try {
       const [
-        { data: progData }, 
-        { data: coursesData }, 
         { data: profilesData }, 
+        { data: coursesData }, 
+        { data: progData }, 
         { data: lessonsData }, 
         { data: lessonProgData }, 
         { data: certsData }, 
         { data: quizAttData }, 
         { data: quizzesData }
       ] = await Promise.all([
-        supabase.from('course_progress').select('*'),
-        supabase.from('courses').select('*'),
         supabase.from('profiles').select('*'),
+        supabase.from('courses').select('*'),
+        supabase.from('course_progress').select('*'),
         supabase.from('lessons').select('*'),
         supabase.from('lesson_progress').select('*'),
         supabase.from('certificates').select('*'),
@@ -92,10 +100,18 @@ export default function AdminDashboard() {
         supabase.from('quizzes').select('*'),
       ])
 
-      const coursesMap = Object.fromEntries((coursesData || []).map(c => [c.id, c]))
       const profilesMap = Object.fromEntries((profilesData || []).map(p => [p.id, p]))
+      const validEmployeeIds = new Set(Object.keys(profilesMap))
+
+      const coursesMap = Object.fromEntries((coursesData || []).map(c => [c.id, c]))
       const lessonsMap = Object.fromEntries((lessonsData || []).map(l => [l.id, l]))
       const quizzesMap = Object.fromEntries((quizzesData || []).map(q => [q.id, q]))
+
+      // تصفية كل الجداول التابعة لتعمل فقط مع الموظفين الموجودين في profiles
+      const validProgData = (progData || []).filter(p => validEmployeeIds.has(p.employee_id))
+      const validLessonProg = (lessonProgData || []).filter(p => validEmployeeIds.has(p.employee_id))
+      const validCerts = (certsData || []).filter(c => validEmployeeIds.has(c.employee_id))
+      const validQuizAttempts = (quizAttData || []).filter(q => validEmployeeIds.has(q.employee_id))
 
       let data = []
 
@@ -103,12 +119,11 @@ export default function AdminDashboard() {
         const uniqueDepts = [...new Set((profilesData || []).map(p => p.department).filter(Boolean))]
 
         data = uniqueDepts.map(deptName => {
-          const deptEmployees = (profilesData || []).filter(p => p.department === deptName)
+          const deptEmployees = (profilesData || []).filter(p => p.department === deptName && p.role === 'employee')
           const empIds = deptEmployees.map(e => e.id)
           
-          const empProgress = (progData || []).filter(p => empIds.includes(p.employee_id))
+          const empProgress = validProgData.filter(p => empIds.includes(p.employee_id))
           
-          // احتساب الكورس كمكتمل إذا كانت الحالة تدل على ذلك أو نسبة التقدم 100%
           const completedProgress = empProgress.filter(p => 
             p.status === 'completed' || 
             p.status === 'Complete' || 
@@ -140,11 +155,10 @@ export default function AdminDashboard() {
           }
         })
       } else if (tab === 'completion') {
-        data = (progData || []).map(item => {
+        data = validProgData.map(item => {
           const course = coursesMap[item.course_id] || {}
           const profile = profilesMap[item.employee_id] || {}
           
-          // إذا كان البروجريس 100%، نجعل الحالة تظهر كـ Completed تلقائياً
           const isCompleted = Number(item.progress_percent || 0) >= 100 || item.status === 'completed'
           
           return {
@@ -156,7 +170,7 @@ export default function AdminDashboard() {
           }
         })
       } else if (tab === 'employee_history') {
-        data = (progData || []).map(item => {
+        data = validProgData.map(item => {
           const course = coursesMap[item.course_id] || {}
           const profile = profilesMap[item.employee_id] || {}
           const isCompleted = Number(item.progress_percent || 0) >= 100 || item.status === 'completed'
@@ -171,7 +185,7 @@ export default function AdminDashboard() {
         })
       } else if (tab === 'course_performance') {
         data = (coursesData || []).map(c => {
-          const cProg = (progData || []).filter(p => p.course_id === c.id)
+          const cProg = validProgData.filter(p => p.course_id === c.id)
           const enrolled = cProg.length
           const completed = cProg.filter(p => p.status === 'completed' || Number(p.progress_percent) >= 100).length
           const passRate = enrolled > 0 ? Math.round((completed / enrolled) * 100) : 0
@@ -186,7 +200,7 @@ export default function AdminDashboard() {
           }
         })
       } else if (tab === 'attendance') {
-        data = (lessonProgData || []).map(item => {
+        data = validLessonProg.map(item => {
           const lesson = lessonsMap[item.lesson_id] || {}
           const profile = profilesMap[item.employee_id] || {}
           return {
@@ -198,7 +212,7 @@ export default function AdminDashboard() {
           }
         })
       } else if (tab === 'certificates') {
-        data = (certsData || []).map(item => {
+        data = validCerts.map(item => {
           const course = coursesMap[item.course_id] || {}
           const profile = profilesMap[item.employee_id] || {}
           return {
@@ -209,7 +223,7 @@ export default function AdminDashboard() {
           }
         })
       } else if (tab === 'assessment') {
-        data = (quizAttData || []).map(item => {
+        data = validQuizAttempts.map(item => {
           const quiz = quizzesMap[item.quiz_id] || {}
           const profile = profilesMap[item.employee_id] || {}
           return {
@@ -304,7 +318,7 @@ export default function AdminDashboard() {
           <h2 className="font-head font-bold text-xl text-white">Advanced Detailed Reports</h2>
           <button
             onClick={exportToExcel}
-            className="px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-teal-500 text-white font-medium text-sm shadow-lg hover:opacity-90 transition-opacity flex items-center gap-2"
+            className="px-4 py-2 rounded-lg bg-gradient-to-r from-teal-600 to-teal-500 text-white font-medium text-sm shadow-lg hover:opacity-95 transition-opacity flex items-center gap-2"
           >
             📥 Export Current Report to Excel
           </button>
