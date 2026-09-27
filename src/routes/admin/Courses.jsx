@@ -49,7 +49,15 @@ export default function AdminCourses() {
         .order('order_index', { ascending: true })
 
       if (error) throw error
-      setCourseModules(mods || [])
+      
+      // تنظيم هيكل الاختبارات داخل المديولات لسهولة التعديل
+      const formattedMods = (mods || []).map(m => ({
+        ...m,
+        quizTitle: m.quizzes?.[0]?.title || '',
+        questions: m.quizzes?.[0]?.questions || []
+      }))
+
+      setCourseModules(formattedMods)
     } catch (err) {
       console.error(err)
       setCourseModules([])
@@ -63,10 +71,11 @@ export default function AdminCourses() {
     setCourseModules(prev => [
       ...prev,
       {
-        title: `New Module ${prev.length + 1}`,
+        title: `Module ${prev.length + 1}`,
         order_index: prev.length + 1,
         lessons: [],
-        quizzes: []
+        quizTitle: '',
+        questions: []
       }
     ])
   }
@@ -86,13 +95,28 @@ export default function AdminCourses() {
     })
   }
 
-  // حفظ جميع التعديلات والمحتوى (المديولات والدروس والاختبارات) في قاعدة البيانات
+  // إضافة سؤال جديد لاختبار المديول
+  const addQuestionLocally = (mIdx) => {
+    setCourseModules(prev => {
+      const updated = [...prev]
+      if (!updated[mIdx].questions) updated[mIdx].questions = []
+      updated[mIdx].questions.push({
+        question_text: '',
+        options: ['', '', '', ''],
+        correct_answer: 0,
+        points: 10
+      })
+      return updated
+    })
+  }
+
+  // حفظ جميع التعديلات والمحتوى (المديولات، الدروس، والاختبارات) في قاعدة البيانات
   const saveAllContentChanges = async () => {
     if (!managingContentCourse) return
     try {
       setSavingContent(true)
 
-      // 1. حذف المديولات القديمة ومرادفاتها لإعادة إدراجها بشكل نظيف ومحدث
+      // 1. حذف المديولات القديمة لإعادة إدراجها بشكل نظيف ومحدث
       await supabase.from('modules').delete().eq('course_id', managingContentCourse.id)
 
       // 2. إعادة إدخال المديولات والدروس والاختبارات المحدثة
@@ -124,21 +148,20 @@ export default function AdminCourses() {
           await supabase.from('lessons').insert(lessonsToInsert)
         }
 
-        // حفظ الاختبار (Quiz) والأسئلة إن وجدت
-        const quizData = mod.quizzes?.[0] || mod.quiz
-        if (quizData && quizData.title) {
+        // حفظ الاختبار (Quiz) والأسئلة المرتبطة به
+        if (mod.quizTitle && mod.questions && mod.questions.length > 0) {
           const { data: newQuiz, error: qErr } = await supabase
             .from('quizzes')
             .insert([{
               module_id: newMod.id,
               course_id: managingContentCourse.id,
-              title: quizData.title
+              title: mod.quizTitle
             }])
             .select()
             .single()
 
-          if (!qErr && newQuiz && quizData.questions) {
-            const questionsToInsert = quizData.questions.map((q, qIdx) => ({
+          if (!qErr && newQuiz) {
+            const questionsToInsert = mod.questions.map((q, qIdx) => ({
               quiz_id: newQuiz.id,
               question_text: q.question_text,
               options: q.options || ['', '', '', ''],
@@ -151,7 +174,7 @@ export default function AdminCourses() {
         }
       }
 
-      alert('Course curriculum, lessons and quizzes updated successfully!')
+      alert('Curriculum, lessons and quizzes updated successfully!')
       setManagingContentCourse(null)
       refresh()
     } catch (err) {
@@ -161,7 +184,7 @@ export default function AdminCourses() {
     }
   }
 
-  // حفظ التعديلات الأساسية
+  // حفظ التعديلات الأساسية للكورس
   const handleSaveEdit = async (e) => {
     e.preventDefault()
     if (!editingCourse) return
@@ -263,7 +286,7 @@ export default function AdminCourses() {
                 <option value="published">Published</option>
               </select>
 
-              {/* زر تعديل المحتوى (المديولات والدروس والاختبارات) */}
+              {/* زر إدارة المنهج (المديولات والدروس والاختبارات) */}
               <button
                 type="button"
                 onClick={() => openContentManager(c)}
@@ -295,10 +318,10 @@ export default function AdminCourses() {
         ))}
       </div>
 
-      {/* نافذة تعديل المعلومات الأساسية */}
+      {/* نافذة تعديل المعلومات الأساسية (بـ z-index مرتفع لتكون فوق القائمة الجانبية تماماً) */}
       {editingCourse && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-[#1b222c] border border-white/10 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="bg-[#1b222c] border border-white/10 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl ml-auto mr-auto">
             <div className="flex justify-between items-center border-b border-white/10 pb-3">
               <h3 className="text-xl font-bold text-rose-500">Edit Course Info: {editingCourse.name}</h3>
               <button onClick={() => setEditingCourse(null)} className="text-gray-400 hover:text-white text-lg font-bold">✕</button>
@@ -358,14 +381,14 @@ export default function AdminCourses() {
         </div>
       )}
 
-      {/* نافذة إدارة المنهج (Curriculum) والمديولات والدروس والاختبارات */}
+      {/* نافذة إدارة المنهج (Curriculum) والمديولات والدروس والاختبارات (بـ z-index مرتفع ومسافة أمان صحيحة) */}
       {managingContentCourse && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-[#14181d] border border-white/10 rounded-2xl max-w-4xl w-full p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto">
+          <div className="bg-[#14181d] border border-white/15 rounded-2xl max-w-4xl w-full p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto my-auto">
             <div className="flex justify-between items-center border-b border-white/10 pb-4">
               <div>
                 <h3 className="text-xl font-bold text-teal-400">Manage Curriculum: {managingContentCourse.name}</h3>
-                <p className="text-xs text-gray-400">Add or modify modules, lessons, videos, and quizzes.</p>
+                <p className="text-xs text-gray-400">Add or modify modules, lessons, and quizzes.</p>
               </div>
               <button onClick={() => setManagingContentCourse(null)} className="text-gray-400 hover:text-white text-lg font-bold">✕</button>
             </div>
@@ -386,7 +409,7 @@ export default function AdminCourses() {
                 </div>
 
                 {courseModules.map((mod, mIdx) => (
-                  <div key={mIdx} className="bg-black/40 border border-white/10 p-5 rounded-xl space-y-4">
+                  <div key={mIdx} className="bg-black/50 border border-white/10 p-5 rounded-xl space-y-5">
                     <div className="flex items-center justify-between gap-3">
                       <input
                         type="text"
@@ -410,7 +433,7 @@ export default function AdminCourses() {
                       </button>
                     </div>
 
-                    {/* الدروس والفيديوهات */}
+                    {/* الدروس */}
                     <div className="space-y-3 pl-4 border-l-2 border-rose-500/40">
                       <div className="flex justify-between items-center">
                         <span className="text-xs font-semibold text-gray-300">Lessons</span>
@@ -424,7 +447,7 @@ export default function AdminCourses() {
                       </div>
 
                       {mod.lessons?.map((lesson, lIdx) => (
-                        <div key={lIdx} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center bg-black/30 p-2.5 rounded-lg border border-white/5">
+                        <div key={lIdx} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center bg-black/40 p-2.5 rounded-lg border border-white/5">
                           <input
                             type="text"
                             placeholder="Lesson Title"
@@ -471,6 +494,62 @@ export default function AdminCourses() {
                           </button>
                         </div>
                       ))}
+                    </div>
+
+                    {/* اختبار المديول (Quiz) */}
+                    <div className="space-y-3 pl-4 border-l-2 border-teal-500/40 pt-2">
+                      <span className="text-xs font-semibold text-teal-400">Module Assessment (Quiz)</span>
+                      <input
+                        type="text"
+                        placeholder="Quiz Title (e.g. Module Assessment)"
+                        value={mod.quizTitle || ''}
+                        onChange={(e) => {
+                          const updated = [...courseModules]
+                          updated[mIdx].quizTitle = e.target.value
+                          setCourseModules(updated)
+                        }}
+                        className="w-full max-w-sm p-2 bg-black/40 border border-white/10 rounded-lg text-xs text-white"
+                      />
+
+                      <div className="space-y-2">
+                        {mod.questions?.map((q, qIdx) => (
+                          <div key={qIdx} className="bg-black/30 p-3 rounded-lg border border-white/10 space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-gray-400">Question {qIdx + 1}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = [...courseModules]
+                                  updated[mIdx].questions = updated[mIdx].questions.filter((_, idx) => idx !== qIdx)
+                                  setCourseModules(updated)
+                                }}
+                                className="text-red-400 text-xs"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              placeholder="Question Text..."
+                              value={q.question_text}
+                              onChange={(e) => {
+                                const updated = [...courseModules]
+                                updated[mIdx].questions[qIdx].question_text = e.target.value
+                                setCourseModules(updated)
+                              }}
+                              className="w-full p-1.5 bg-black/40 border border-white/10 rounded text-xs text-white"
+                            />
+                          </div>
+                        ))}
+
+                        <button
+                          type="button"
+                          onClick={() => addQuestionLocally(mIdx)}
+                          className="text-xs bg-teal-600/20 text-teal-300 hover:bg-teal-600/30 px-3 py-1.5 rounded"
+                        >
+                          + Add Question
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
