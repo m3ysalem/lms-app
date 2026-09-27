@@ -12,7 +12,8 @@ export default function Certificates() {
     if (!profile?.id) return
     getMyCertificates(profile.id)
       .then((data) => {
-        // تأكد من جلب البيانات بشكل سليم ومعالجة أي صيغة غير متوقعة
+        // طباعة البيانات في الـ Console لمعرفة أسماء الحقول بدقة
+        console.log("Certificates Raw Data:", data)
         setCerts(data || [])
       })
       .catch((err) => {
@@ -34,15 +35,22 @@ export default function Certificates() {
         <EmptyState title="No certificates yet" body="Complete a certificate-eligible course and pass its quiz to earn one." />
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {certs.map((c) => {
-            // جلب اسم الكورس الفعلي بشكل دقيق وحمايته
-            const courseName = c.course?.name || c.course_name || c.name || 'Course Completion'
-            
-            // تعريف اسم الموظف محلياً داخل اللوب لضمان عدم حدوث خطأ
+          {certs.map((c, index) => {
+            // معالجة شاملة لكل الاحتمالات الممكنة لاسم الكورس في الـ Object
+            const courseName = 
+              c.course?.name || 
+              c.courses?.name || 
+              c.course_name || 
+              c.name || 
+              c.title || 
+              c.course_title || 
+              (typeof c.course === 'string' ? c.course : null) || 
+              `Course #${index + 1}`
+
             const employeeName = profile?.full_name || profile?.name || c.employee_name || 'Employee'
 
             return (
-              <div key={c.id || c.cert_number} className="card p-5 flex flex-col justify-between bg-[#14181d]/85 border border-white/10 rounded-2xl backdrop-blur-xl text-white">
+              <div key={c.id || c.cert_number || index} className="card p-5 flex flex-col justify-between bg-[#14181d]/85 border border-white/10 rounded-2xl backdrop-blur-xl text-white">
                 <div className="space-y-2">
                   {/* عرض اسم الكورس الحقيقي الديناميكي */}
                   <h3 className="font-semibold text-lg text-rose-300">{courseName}</h3>
