@@ -21,18 +21,13 @@ export default function AdminReports() {
   // دالة ذكية لاستخراج عدد الدقائق من أي كورس بغض النظر عن اسم الحقل أو صيغته
   const getCourseDurationMinutes = (course) => {
     if (!course) return 0
-    // فحص كل الاحتمالات الممكنة في الجدول
     const rawVal = course.duration ?? course.duration_mins ?? course.minutes ?? course.time ?? 0
     
-    // لو القيمة رقم مباشر (نعتبرها دقائق افتراضياً أو ساعات حسب نظامكم، الغالب دقائق أو ساعات)
     const num = Number(rawVal)
     if (!isNaN(num) && num > 0) {
-      // لو الكورس مدته قليلة جداً قد تكون ساعات، لكن لو الأغلب بالدقائق بنتعامل معها. 
-      // لو أنتم مسجلين المدة بالدقائق (مثلا 60 دقيقة)، فهنا تمام. 
       return num
     }
     
-    // لو النص يحتوي على كلمات مثل hours أو mins
     const strVal = String(rawVal).toLowerCase()
     let totalMins = 0
     const hourMatch = strVal.match(/(\d+)\s*(h|hr|hour|ساعة)/)
@@ -87,9 +82,12 @@ export default function AdminReports() {
         const uniqueDepts = [...new Set((profilesData || []).map(p => p.department).filter(Boolean))]
 
         data = uniqueDepts.map(deptName => {
+          // فلترة الأقسام بحيث نأخذ فقط الأقسام التي بها موظفين فعليين
           const deptEmployees = (profilesData || []).filter(p => p.department === deptName && p.role === 'employee')
-          const empIds = deptEmployees.map(e => e.id)
           
+          if (deptEmployees.length === 0) return null
+
+          const empIds = deptEmployees.map(e => e.id)
           const empProgress = validProgData.filter(p => empIds.includes(p.employee_id))
           
           const completedProgress = empProgress.filter(p => 
@@ -99,14 +97,12 @@ export default function AdminReports() {
             Number(p.progress_percent) >= 100
           )
 
-          // حساب إجمالي الساعات التدريبية بناءً على الدورات المكتملة لكل موظف في القسم
           const totalMinutes = completedProgress.reduce((acc, curr) => {
             const course = coursesMap[curr.course_id] || {}
             return acc + getCourseDurationMinutes(course)
           }, 0)
 
           const totalHours = totalMinutes > 0 ? (totalMinutes / 60) : 0
-
           const totalAssigned = empProgress.length
           const completedCount = completedProgress.length
           const successRate = totalAssigned > 0 ? Math.round((completedCount / totalAssigned) * 100) : 0
@@ -121,7 +117,7 @@ export default function AdminReports() {
             'Success Rate (%)': successRate + '%',
             'Incomplete / Failure Rate (%)': failureRate + '%'
           }
-        })
+        }).filter(Boolean)
       } else if (tab === 'completion') {
         data = validProgData.map(item => {
           const course = coursesMap[item.course_id] || {}
@@ -253,7 +249,7 @@ export default function AdminReports() {
     <div className="space-y-8 text-white">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="test-3xl font-black font-head tracking-wide text-white text-3xl">Advanced Reports & Analytics</h1>
+          <h1 className="text-3xl font-black font-head tracking-wide text-white">Advanced Reports & Analytics</h1>
           <p className="text-gray-400 mt-1 text-sm">Comprehensive platform metrics and detailed employee reports.</p>
         </div>
         <Link
