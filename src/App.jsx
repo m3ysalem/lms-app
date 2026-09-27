@@ -17,7 +17,7 @@ import AdminEmployees from './routes/admin/Employees'
 import AdminCourses from './routes/admin/Courses'
 import AdminCourseBuilder from './routes/admin/CourseBuilder'
 import AdminAssignments from './routes/admin/Assignments'
-import AdminReports from './pages/admin/AdminReports' // <--- 1. استيراد صفحة التقارير الجديدة
+import AdminReports from './routes/admin/AdminReports'
 
 export default function App() {
   return (
