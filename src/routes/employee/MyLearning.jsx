@@ -47,7 +47,13 @@ export default function MyLearning() {
         <div className="space-y-3">
           {filtered.map((a) => {
             const courseId = a.course?.id || a.course_id
-            const courseName = a.course?.name || 'Course'
+            
+            // ضبط اسم الكورس ليظهر بشكل صحيح مع كلمة Course
+            const rawCourseName = a.course?.name || a.course_name || a.name || 'Course'
+            const courseName = rawCourseName.toLowerCase().includes('course') 
+              ? rawCourseName 
+              : `${rawCourseName} Course`
+
             const p = progressMap[courseId]
             const isOverdue = a.status !== 'completed' && a.due_date && new Date(a.due_date) < new Date()
             
