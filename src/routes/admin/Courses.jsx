@@ -11,6 +11,10 @@ export default function AdminCourses() {
   const [courses, setCourses] = useState(null)
   const [categories, setCategories] = useState([])
   const [trainers, setTrainers] = useState([])
+  
+  // حالات للتحكم في نافذة التعديل المباشر (Modal)
+  const [editingCourse, setEditingCourse] = useState(null)
+  const [savingEdit, setSavingEdit] = useState(false)
 
   const refresh = () => listAllCourses().then(setCourses)
 
@@ -20,7 +24,37 @@ export default function AdminCourses() {
     listTrainers().then(setTrainers)
   }, [])
 
-  // دالة لتغيير حالة الكورس (Published / Draft) مباشرة من القائمة المنسدلة السريعة
+  // دالة حفظ التعديلات مباشرة
+  const handleSaveEdit = async (e) => {
+    e.preventDefault()
+    if (!editingCourse) return
+
+    try {
+      setSavingEdit(true)
+      const { error } = await supabase
+        .from('courses')
+        .update({
+          name: editingCourse.name,
+          description: editingCourse.description,
+          status: editingCourse.status,
+          passing_score: editingCourse.passing_score,
+          publish_date: editingCourse.status === 'published' ? new Date().toISOString().slice(0, 10) : null
+        })
+        .eq('id', editingCourse.id)
+
+      if (error) throw error
+
+      alert('Course updated successfully!')
+      setEditingCourse(null)
+      refresh()
+    } catch (err) {
+      alert('Failed to update course: ' + err.message)
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  // دالة لتغيير الحالة سريعا من القائمة
   const handleStatusChange = async (courseId, newStatus) => {
     try {
       const { error } = await supabase
@@ -38,7 +72,7 @@ export default function AdminCourses() {
     }
   }
 
-  // دالة حذف الكورس (مخصصة للأدمن فقط)
+  // دالة حذف الكورس
   const handleDeleteCourse = async (e, courseId) => {
     e.preventDefault()
     if (!window.confirm('Are you sure you want to delete this course?')) return
@@ -59,70 +93,56 @@ export default function AdminCourses() {
   const isAdmin = profile?.role === 'admin' || profile?.is_admin || true
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-white relative">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Courses</h1>
-          <p className="text-muted mt-1">{courses.length} courses</p>
+          <h1 className="text-3xl font-bold">Courses Management</h1>
+          <p className="text-gray-400 mt-1">{courses.length} total courses available</p>
         </div>
-        {/* زر إنشاء كورس جديد يوجهك لشاشة الإنشاء الشاملة */}
         <button 
-          className="btn-primary" 
+          className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-medium transition-all shadow-lg" 
           onClick={() => navigate('/admin/courses/new')}
         >
-          Create course
+          + Create New Course
         </button>
       </div>
 
-      <div className="card divide-y divide-surface-border">
+      <div className="card divide-y divide-white/10 bg-[#14181d]/85 border border-white/10 rounded-2xl overflow-hidden backdrop-blur-xl">
         {courses.map((c) => (
-          <div key={c.id} className="p-4 flex items-center justify-between hover:bg-surface transition-colors">
-            {/* الضغط على اسم الكورس يوجهك لصفحة تفاصيل الكورس */}
-            <div 
-              className="cursor-pointer flex-1"
-              onClick={() => navigate(`/admin/courses/${c.id}`)}
-            >
-              <p className="font-medium text-ink-800">{c.name}</p>
-              <p className="text-xs text-muted mt-0.5">{c.course_code} · {c.category?.name || 'Uncategorized'}</p>
+          <div key={c.id} className="p-4 flex items-center justify-between hover:bg-white/5 transition-colors">
+            <div className="flex-1 pr-4">
+              <p className="font-bold text-lg text-white">{c.name}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{c.course_code || 'N/A'} · {c.category?.name || 'Uncategorized'}</p>
             </div>
 
             <div className="flex items-center gap-3">
-              {c.is_required && <Badge tone="warning">Required</Badge>}
+              {c.is_required && <span className="px-2.5 py-1 text-xs bg-amber-500/20 text-amber-400 rounded-md">Required</span>}
               
-              {/* قائمة منسدلة سريعة لتغيير حالة الكورس (Draft / Published) بدون الدخول للصفحة */}
+              {/* قائمة لتغيير الحالة فوراً */}
               <select
                 value={c.status || 'draft'}
                 onChange={(e) => handleStatusChange(c.id, e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                className="text-xs p-1.5 rounded bg-black/30 border border-white/20 text-white cursor-pointer focus:outline-none"
+                className="text-xs p-1.5 rounded-lg bg-black/40 border border-white/20 text-white cursor-pointer focus:outline-none"
               >
                 <option value="draft">Draft</option>
                 <option value="published">Published</option>
               </select>
 
-              {/* زر التعديل (Edit) الموجه لصفحة تفاصيل أو تعديل الكورس */}
+              {/* زر التعديل المباشر (يفتح نافذة التعديل دون الانتقال لأي شاشة خطأ) */}
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  navigate(`/admin/courses/${c.id}`)
-                }}
-                className="px-3 py-1 text-xs font-medium bg-blue-500/10 text-blue-600 hover:bg-blue-500 hover:text-white rounded-lg transition-colors border border-blue-500/20"
-                title="Edit Course Details"
+                onClick={() => setEditingCourse({ ...c })}
+                className="px-3 py-1.5 text-xs font-medium bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white rounded-lg transition-colors border border-blue-500/30"
               >
-                Edit
+                Edit Details
               </button>
 
               {/* زر الحذف */}
               {isAdmin && (
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDeleteCourse(e, c.id)
-                  }}
-                  className="px-3 py-1 text-xs font-medium bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white rounded-lg transition-colors border border-rose-500/20"
-                  title="Delete Course"
+                  onClick={(e) => handleDeleteCourse(e, c.id)}
+                  className="px-3 py-1.5 text-xs font-medium bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white rounded-lg transition-colors border border-rose-500/30"
                 >
                   Delete
                 </button>
@@ -131,6 +151,86 @@ export default function AdminCourses() {
           </div>
         ))}
       </div>
+
+      {/* نافذة التعديل المباشر (Modal) لتعديل اسم الكورس وحالته ووصفه بكل سهولة */}
+      {editingCourse && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-[#1b222c] border border-white/10 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-white/10 pb-3">
+              <h3 className="text-xl font-bold text-rose-500">Edit Course: {editingCourse.name}</h3>
+              <button 
+                onClick={() => setEditingCourse(null)}
+                className="text-gray-400 hover:text-white text-lg font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-300 mb-1">Course Name</label>
+                <input 
+                  type="text"
+                  value={editingCourse.name || ''}
+                  onChange={(e) => setEditingCourse({ ...editingCourse, name: e.target.value })}
+                  className="w-full p-2.5 bg-black/40 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-rose-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-300 mb-1">Description</label>
+                <textarea 
+                  rows="3"
+                  value={editingCourse.description || ''}
+                  onChange={(e) => setEditingCourse({ ...editingCourse, description: e.target.value })}
+                  className="w-full p-2.5 bg-black/40 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-rose-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-300 mb-1">Status</label>
+                  <select 
+                    value={editingCourse.status || 'draft'}
+                    onChange={(e) => setEditingCourse({ ...editingCourse, status: e.target.value })}
+                    className="w-full p-2.5 bg-black/40 border border-white/10 rounded-lg text-sm text-white focus:outline-none"
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="published">Published</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-300 mb-1">Passing Score (%)</label>
+                  <input 
+                    type="number"
+                    value={editingCourse.passing_score || 70}
+                    onChange={(e) => setEditingCourse({ ...editingCourse, passing_score: Number(e.target.value) })}
+                    className="w-full p-2.5 bg-black/40 border border-white/10 rounded-lg text-sm text-white focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setEditingCourse(null)}
+                  className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="px-6 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-medium transition-colors shadow-lg"
+                >
+                  {savingEdit ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
