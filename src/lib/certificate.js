@@ -24,7 +24,7 @@ export async function downloadCertificatePdf(cert) {
   const font = await doc.embedFont(StandardFonts.TimesRomanBold)
   const bodyFont = await doc.embedFont(StandardFonts.Helvetica)
 
-  // الألوان (الأحمر المتناسق مع اللوجو ودرجات الألوان الرسمية)
+  // الألوان
   const brandRed = rgb(0x8b / 255, 0x1e / 255, 0x24 / 255)
   const navy = rgb(0x1b / 255, 0x2a / 255, 0x4a / 255)
   const gray = rgb(0x66 / 255, 0x70 / 255, 0x85 / 255)
@@ -51,12 +51,21 @@ export async function downloadCertificatePdf(cert) {
     })
   }
 
-  // 2. اسم الكورس (تم رفعه لفوق لتجنب التداخل عن طريق زيادة قيمة الـ y إلى 265)
+  // 2. إخفاء النص القديم المرسوم في الصورة عبر رسم مستطيل أبيض صغير مكانه (اختياري حسب تصميم صورتك)
+  page.drawRectangle({
+    x: 200,
+    y: 250,
+    width: 442,
+    height: 40,
+    color: rgb(1, 1, 1), // لون أبيض لتغطية الكلمة القديمة الثابتة في الصورة
+  })
+
+  // 3. اسم الكورس الحقيقي الديناميكي
   if (cert.course_name) {
     const courseSize = 22
     let courseRaw = cert.course_name
     
-    const courseText = courseRaw.toLowerCase().includes('course') ? courseRaw : `${courseRaw} Course`
+    const courseText = courseRaw.toLowerCase().includes('course') ? courseRaw : `${courseRaw}`
     const textWidth = font.widthOfTextAtSize(courseText, courseSize)
     
     safeDrawText(courseText, {
