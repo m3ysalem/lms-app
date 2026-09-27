@@ -35,17 +35,20 @@ export default function Certificates() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {certs.map((c) => {
-            // معالجة آمنة لاسم الكورس وبيانات الشهادة لضمان عدم ظهور قيم فارغة
-            const courseName = c.course?.name || c.course_name || 'Course Completion'
-            const employeeName = profile?.full_name || c.employee_name || 'Employee'
+            // معالجة آمنة لاسم الكورس وبيانات الشهادة لضمان جلب اسم الكورس الفعلي وعدم ظهور قيم فارغة
+            const courseName = c.course?.name || c.course_name || c.name || 'Course Completion'
+            const employeeName = profile?.full_name || profile?.name || c.employee_name || 'Employee'
 
             return (
-              <div key={c.id || c.cert_number} className="card p-5 flex flex-col">
-                <p className="font-medium text-ink-800">{courseName}</p>
-                <p className="text-xs text-muted mt-1">{c.cert_number || 'N/A'}</p>
-                <p className="text-xs text-muted">Issued {c.issued_date || '—'} · Score {c.final_score || 100}%</p>
+              <div key={c.id || c.cert_number} className="card p-5 flex flex-col justify-between bg-[#14181d]/85 border border-white/10 rounded-2xl backdrop-blur-xl text-white">
+                <div className="space-y-2">
+                  {/* عرض اسم الكورس الحقيقي الديناميكي */}
+                  <h3 className="font-semibold text-lg text-rose-300">{courseName}</h3>
+                  <p className="text-xs text-gray-400">Cert ID: {c.cert_number || 'N/A'}</p>
+                  <p className="text-xs text-gray-400">Issued: {c.issued_date || '—'} · Score: {c.final_score || 100}%</p>
+                </div>
                 <button
-                  className="btn-secondary mt-4"
+                  className="mt-4 px-4 py-2 rounded-lg bg-rose-700 hover:bg-rose-800 text-white font-medium transition-colors shadow-lg text-sm"
                   onClick={() => downloadCertificatePdf({
                     cert_number: c.cert_number,
                     employee_name: employeeName,
