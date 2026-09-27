@@ -18,7 +18,33 @@ export default function AdminReports() {
   const [loadingReport, setLoadingReport] = useState(false)
   const [reportData, setReportData] = useState([])
 
-  // جلب وتجهيز بيانات التقارير بشكل دقيق ومفلتر
+  // دالة ذكية لاستخراج عدد الدقائق من أي كورس بغض النظر عن اسم الحقل أو صيغته
+  const getCourseDurationMinutes = (course) => {
+    if (!course) return 0
+    // فحص كل الاحتمالات الممكنة في الجدول
+    const rawVal = course.duration ?? course.duration_mins ?? course.minutes ?? course.time ?? 0
+    
+    // لو القيمة رقم مباشر (نعتبرها دقائق افتراضياً أو ساعات حسب نظامكم، الغالب دقائق أو ساعات)
+    const num = Number(rawVal)
+    if (!isNaN(num) && num > 0) {
+      // لو الكورس مدته قليلة جداً قد تكون ساعات، لكن لو الأغلب بالدقائق بنتعامل معها. 
+      // لو أنتم مسجلين المدة بالدقائق (مثلا 60 دقيقة)، فهنا تمام. 
+      return num
+    }
+    
+    // لو النص يحتوي على كلمات مثل hours أو mins
+    const strVal = String(rawVal).toLowerCase()
+    let totalMins = 0
+    const hourMatch = strVal.match(/(\d+)\s*(h|hr|hour|ساعة)/)
+    const minMatch = strVal.match(/(\d+)\s*(m|min|minute|دقيقة)/)
+    
+    if (hourMatch) totalMins += parseInt(hourMatch[1]) * 60
+    if (minMatch) totalMins += parseInt(minMatch[1])
+    
+    return totalMins > 0 ? totalMins : 0
+  }
+
+  // جلب وتجهيز بيانات التقارير بشكل دقيق ومفلتر ومتكامل
   const fetchReportData = async (tab) => {
     setLoadingReport(true)
     try {
@@ -49,7 +75,7 @@ export default function AdminReports() {
       const lessonsMap = Object.fromEntries((lessonsData || []).map(l => [l.id, l]))
       const quizzesMap = Object.fromEntries((quizzesData || []).map(q => [q.id, q]))
 
-      // تصفية كل الجداول التابعة لتعمل فقط مع الموظفين الموجودين في profiles
+      // تصفية صارمة لكل الجداول المرتبطة بالموظفين الموجودين فقط في الـ profiles
       const validProgData = (progData || []).filter(p => validEmployeeIds.has(p.employee_id))
       const validLessonProg = (lessonProgData || []).filter(p => validEmployeeIds.has(p.employee_id))
       const validCerts = (certsData || []).filter(c => validEmployeeIds.has(c.employee_id))
@@ -73,10 +99,10 @@ export default function AdminReports() {
             Number(p.progress_percent) >= 100
           )
 
+          // حساب إجمالي الساعات التدريبية بناءً على الدورات المكتملة لكل موظف في القسم
           const totalMinutes = completedProgress.reduce((acc, curr) => {
             const course = coursesMap[curr.course_id] || {}
-            const durationMins = Number(course.duration || course.duration_mins || course.minutes || 0)
-            return acc + durationMins
+            return acc + getCourseDurationMinutes(course)
           }, 0)
 
           const totalHours = totalMinutes > 0 ? (totalMinutes / 60) : 0
@@ -131,11 +157,13 @@ export default function AdminReports() {
           const enrolled = cProg.length
           const completed = cProg.filter(p => p.status === 'completed' || Number(p.progress_percent) >= 100).length
           const passRate = enrolled > 0 ? Math.round((completed / enrolled) * 100) : 0
+          const durationMins = getCourseDurationMinutes(c)
+          
           return {
             'Course Code': c.id ? c.id.substring(0, 8) : 'N/A',
             'Course Name': c.name || 'N/A',
             'Status': c.status || 'N/A',
-            'Duration (Mins)': c.duration || 0,
+            'Duration': durationMins > 0 ? `${durationMins} mins` : (c.duration || 'N/A'),
             'Total Enrolled': enrolled,
             'Completed Count': completed,
             'Success Rate': passRate + '%'
@@ -225,7 +253,7 @@ export default function AdminReports() {
     <div className="space-y-8 text-white">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-3xl font-black font-head tracking-wide text-white">Advanced Reports & Analytics</h1>
+          <h1 className="test-3xl font-black font-head tracking-wide text-white text-3xl">Advanced Reports & Analytics</h1>
           <p className="text-gray-400 mt-1 text-sm">Comprehensive platform metrics and detailed employee reports.</p>
         </div>
         <Link
