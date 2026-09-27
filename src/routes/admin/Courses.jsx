@@ -22,7 +22,7 @@ export default function AdminCourses() {
 
   // دالة حذف الكورس (مخصصة للأدمن فقط)
   const handleDeleteCourse = async (e, courseId) => {
-    e.preventDefault() // لمنع الانتقال لصفحة تفاصيل الكورس عند الضغط على زر الحذف داخل الـ Link
+    e.preventDefault() // لمنع الانتقال للصفحة عند الضغط على زر الحذف
     if (!window.confirm('Are you sure you want to delete this course?')) return
 
     try {
@@ -51,7 +51,7 @@ export default function AdminCourses() {
           <h1 className="text-2xl font-bold">Courses</h1>
           <p className="text-muted mt-1">{courses.length} courses</p>
         </div>
-        {/* عند الضغط هنا، سينقلك مباشرة لشاشة إنشاء الكورس والمديولات والدروس والاختبارات */}
+        {/* زر إنشاء كورس جديد */}
         <button 
           className="btn-primary" 
           onClick={() => navigate('/admin/courses/new')}
@@ -71,6 +71,19 @@ export default function AdminCourses() {
               {c.is_required && <Badge tone="warning">Required</Badge>}
               <Badge tone={c.status === 'published' ? 'success' : 'default'}>{c.status}</Badge>
               
+              {/* زر التعديل (Edit) */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault()
+                  navigate(`/admin/courses/${c.id}`) // أو مسار صفحة التعديل الخاصة بك لو كانت منفصلة
+                }}
+                className="px-3 py-1 text-xs font-medium bg-blue-500/10 text-blue-600 hover:bg-blue-500 hover:text-white rounded-lg transition-colors border border-blue-500/20"
+                title="Edit Course"
+              >
+                Edit
+              </button>
+
               {/* زر الحذف يظهر للأدمن فقط */}
               {isAdmin && (
                 <button
