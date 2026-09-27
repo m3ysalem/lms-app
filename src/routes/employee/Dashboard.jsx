@@ -176,7 +176,7 @@ export default function Dashboard() {
           </div>
           <div className="flex gap-4 flex-wrap">
             {certificates.slice(0, 3).map((c) => {
-              const courseTitle = c.course?.name || c.course?.title || 'Course Certificate'
+         const courseTitle = c.course?.name || c.course?.title || c.course_name || assignments.find(a => a.course_id === c.course_id)?.course?.name || 'Course Title'
               const certCode = c.cert_number || c.certificate_code || 'N/A'
 
               return (
