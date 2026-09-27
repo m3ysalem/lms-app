@@ -7,6 +7,7 @@ export default function CreateCourse() {
   const [departments, setDepartments] = useState([])
   const [selectedDepts, setSelectedDepts] = useState([])
   const [busy, setBusy] = useState(false)
+  const [uploadingFile, setUploadingFile] = useState(false)
 
   // بيانات الكورس الأساسية
   const [courseData, setCourseData] = useState({
@@ -17,12 +18,19 @@ export default function CreateCourse() {
     required: false
   })
 
-  // هيكل الوحدات والدروس والاختبارات داخل الكورس
+  // هيكل الوحدات والدروس والاختبارات داخل الكورس (يدعم الأنواع: video, pdf, text)
   const [modules, setModules] = useState([
     {
       title: 'Module 1',
       lessons: [
-        { title: '', video_url: '', duration: 15 } // المدة بالدقائق عشان تسمع في تقارير ساعات التدريب
+        { 
+          title: '', 
+          content_type: 'video', // video, pdf, text
+          video_url: '', 
+          pdf_url: '', 
+          text_content: '', 
+          duration: 15 
+        }
       ],
       quiz: {
         title: '',
@@ -60,7 +68,7 @@ export default function CreateCourse() {
       ...prev,
       {
         title: `Module ${prev.length + 1}`,
-        lessons: [{ title: '', video_url: '', duration: 15 }],
+        lessons: [{ title: '', content_type: 'video', video_url: '', pdf_url: '', text_content: '', duration: 15 }],
         quiz: { title: '', questions: [{ question_text: '', options: ['', '', '', ''], correct_answer: 0, points: 10 }] }
       }
     ])
@@ -73,7 +81,7 @@ export default function CreateCourse() {
   const addLesson = (mIdx) => {
     setModules(prev => {
       const updated = [...prev]
-      updated[mIdx].lessons.push({ title: '', video_url: '', duration: 15 })
+      updated[mIdx].lessons.push({ title: '', content_type: 'video', video_url: '', pdf_url: '', text_content: '', duration: 15 })
       return updated
     })
   }
@@ -84,6 +92,39 @@ export default function CreateCourse() {
       updated[mIdx].lessons = updated[mIdx].lessons.filter((_, idx) => idx !== lIdx)
       return updated
     })
+  }
+
+  // رفع ملف PDF إلى Supabase Storage
+  const handleFileUpload = async (e, mIdx, lIdx) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    try {
+      setUploadingFile(true)
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Math.random().toString(36.substring(2))}_${Date.now()}.${fileExt}`
+      const filePath = `course_files/${fileName}`
+
+      // تأكد أن الـ bucket اسمه course-files أو قم بتعديله حسب الموجود عندك
+      const { error: uploadError } = await supabase.storage
+        .from('course-files') 
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('course-files')
+        .getPublicUrl(filePath)
+
+      const updated = [...modules]
+      updated[mIdx].lessons[lIdx].pdf_url = publicUrl
+      setModules(updated)
+      alert('PDF uploaded successfully!')
+    } catch (err) {
+      alert('Failed to upload file: ' + err.message)
+    } finally {
+      setUploadingFile(false)
+    }
   }
 
   const addQuestion = (mIdx) => {
@@ -102,7 +143,7 @@ export default function CreateCourse() {
     })
   }
 
-  // حفظ الكورس بالكامل وربطه بكل الجداول لضمان عمل التقارير بدقة
+  // حفظ الكورس بالكامل
   const handleCreate = async (e) => {
     e.preventDefault()
     if (!courseData.name.trim()) {
@@ -113,7 +154,6 @@ export default function CreateCourse() {
     try {
       setBusy(true)
 
-      // 1. حساب إجمالي مدة الكورس بالدقائق من جميع الدروس لتظهر في التقارير
       let totalCourseDurationMins = 0
       modules.forEach(m => {
         m.lessons.forEach(l => {
@@ -121,7 +161,6 @@ export default function CreateCourse() {
         })
       })
 
-      // 2. إدخال الكورس الأساسي في جدول courses
       const { data: newCourse, error: courseError } = await supabase
         .from('courses')
         .insert([{
@@ -130,14 +169,13 @@ export default function CreateCourse() {
           passing_score: Number(courseData.passing_score),
           certificate_eligible: courseData.certificate_eligible,
           required: courseData.required,
-          duration: totalCourseDurationMins // حفظ إجمالي الدقائق عشان تقارير ساعات التدريب تقرأها صح
+          duration: totalCourseDurationMins
         }])
         .select()
         .single()
 
       if (courseError) throw courseError
 
-      // 3. ربط الكورس بالأقسام المستهدفة
       if (selectedDepts.length > 0 && newCourse) {
         const relations = selectedDepts.map(deptId => ({
           course_id: newCourse.id,
@@ -147,13 +185,11 @@ export default function CreateCourse() {
         if (relationError) throw relationError
       }
 
-      // 4. إدخال الوحدات (Modules)، الدروس (Lessons)، والاختبارات (Quizzes)
       for (let i = 0; i < modules.length; i++) {
         const mod = modules[i]
         
-        // إدخال الموديل (تأكد من توافق اسم الجدول عندك مثل modules أو course_modules)
         const { data: newModule, error: modErr } = await supabase
-          .from('modules') // لو الجدول عندك اسمه مختلف مثل course_modules غيرها هنا
+          .from('modules')
           .insert([{
             course_id: newCourse.id,
             title: mod.title,
@@ -167,20 +203,21 @@ export default function CreateCourse() {
           continue
         }
 
-        // إدخال الدروس المرتبطة بالموديل
         if (newModule && mod.lessons.length > 0) {
           const lessonsToInsert = mod.lessons.map((l, lIdx) => ({
             module_id: newModule.id,
             course_id: newCourse.id,
             title: l.title || `Lesson ${lIdx + 1}`,
-            video_url: l.video_url || '',
+            content_type: l.content_type,
+            video_url: l.content_type === 'video' ? l.video_url : '',
+            pdf_url: l.content_type === 'pdf' ? l.pdf_url : '',
+            text_content: l.content_type === 'text' ? l.text_content : '',
             duration: Number(l.duration || 15),
             order_index: lIdx + 1
           }))
           await supabase.from('lessons').insert(lessonsToInsert)
         }
 
-        // إدخال الاختبار (Quiz) والأسئلة لضمان ظهور تقارير Assessment Report
         if (newModule && mod.quiz && mod.quiz.questions.length > 0 && mod.quiz.title) {
           const { data: newQuiz, error: quizErr } = await supabase
             .from('quizzes')
@@ -196,7 +233,7 @@ export default function CreateCourse() {
             const questionsToInsert = mod.quiz.questions.map((q, qIdx) => ({
               quiz_id: newQuiz.id,
               question_text: q.question_text,
-              options: q.options, // لو السجل خزّنها كـ JSON
+              options: q.options,
               correct_answer: q.correct_answer,
               points: Number(q.points || 10),
               order_index: qIdx + 1
@@ -206,7 +243,7 @@ export default function CreateCourse() {
         }
       }
 
-      alert('Course, modules, lessons, and quizzes created successfully and linked to reports!')
+      alert('Course, modules, lessons, and quizzes created successfully!')
       navigate('/admin/courses')
     } catch (err) {
       alert('Failed to create course: ' + err.message)
@@ -220,7 +257,7 @@ export default function CreateCourse() {
       <h1 className="text-3xl font-bold">Create New Course & Curriculum</h1>
       
       <form onSubmit={handleCreate} className="space-y-8">
-        {/* معلومات الكورس */}
+        {/* معلومات الكورس الأساسية */}
         <div className="p-6 rounded-2xl bg-[#14181d]/85 border border-white/10 space-y-4">
           <h2 className="text-xl font-semibold text-rose-500">1. Basic Information</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -299,7 +336,7 @@ export default function CreateCourse() {
           </div>
         </div>
 
-        {/* الوحدات والدروس والفيديوهات والاختبارات */}
+        {/* الموديلات والدروس والاختبارات */}
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-rose-500">3. Course Modules, Lessons & Quizzes</h2>
@@ -337,10 +374,10 @@ export default function CreateCourse() {
                 )}
               </div>
 
-              {/* الدروس والفيديوهات */}
+              {/* الدروس وتنوع المحتوى */}
               <div className="space-y-4 pl-4 border-l-2 border-rose-500/30">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Lessons & Videos</h3>
+                  <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Lessons & Content</h3>
                   <button
                     type="button"
                     onClick={() => addLesson(mIdx)}
@@ -351,24 +388,67 @@ export default function CreateCourse() {
                 </div>
 
                 {mod.lessons.map((lesson, lIdx) => (
-                  <div key={lIdx} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center bg-black/30 p-3 rounded-xl border border-white/5">
-                    <div className="md:col-span-4">
-                      <input
-                        type="text"
-                        placeholder="Lesson Title"
-                        value={lesson.title}
-                        onChange={(e) => {
-                          const updated = [...modules]
-                          updated[mIdx].lessons[lIdx].title = e.target.value
-                          setModules(updated)
-                        }}
-                        className="w-full p-2 bg-black/40 border border-white/10 rounded-lg text-sm text-white"
-                      />
+                  <div key={lIdx} className="bg-black/30 p-4 rounded-xl border border-white/5 space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                      <div className="md:col-span-5">
+                        <input
+                          type="text"
+                          placeholder="Lesson Title"
+                          value={lesson.title}
+                          onChange={(e) => {
+                            const updated = [...modules]
+                            updated[mIdx].lessons[lIdx].title = e.target.value
+                            setModules(updated)
+                          }}
+                          className="w-full p-2 bg-black/40 border border-white/10 rounded-lg text-sm text-white"
+                        />
+                      </div>
+                      <div className="md:col-span-4">
+                        <select
+                          value={lesson.content_type}
+                          onChange={(e) => {
+                            const updated = [...modules]
+                            updated[mIdx].lessons[lIdx].content_type = e.target.value
+                            setModules(updated)
+                          }}
+                          className="w-full p-2 bg-black/40 border border-white/10 rounded-lg text-sm text-white"
+                        >
+                          <option value="video">External Video (YouTube/URL)</option>
+                          <option value="pdf">Upload PDF Document</option>
+                          <option value="text">Manual Text Notes</option>
+                        </select>
+                      </div>
+                      <div className="md:col-span-2">
+                        <input
+                          type="number"
+                          placeholder="Mins"
+                          value={lesson.duration}
+                          onChange={(e) => {
+                            const updated = [...modules]
+                            updated[mIdx].lessons[lIdx].duration = e.target.value
+                            setModules(updated)
+                          }}
+                          className="w-full p-2 bg-black/40 border border-white/10 rounded-lg text-sm text-white"
+                        />
+                      </div>
+                      <div className="md:col-span-1 text-center">
+                        {mod.lessons.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeLesson(mIdx, lIdx)}
+                            className="text-red-400 hover:text-red-300 text-xs font-bold"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="md:col-span-5">
+
+                    {/* حقول محتوى الدرس حسب النوع المختار */}
+                    {lesson.content_type === 'video' && (
                       <input
                         type="text"
-                        placeholder="Video URL (e.g. YouTube/MP4 link)"
+                        placeholder="Paste External Video URL (YouTube, MP4, etc.)"
                         value={lesson.video_url}
                         onChange={(e) => {
                           const updated = [...modules]
@@ -377,36 +457,39 @@ export default function CreateCourse() {
                         }}
                         className="w-full p-2 bg-black/40 border border-white/10 rounded-lg text-sm text-white"
                       />
-                    </div>
-                    <div className="md:col-span-2">
-                      <input
-                        type="number"
-                        placeholder="Mins"
-                        value={lesson.duration}
+                    )}
+
+                    {lesson.content_type === 'pdf' && (
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="file"
+                          accept="application/pdf"
+                          onChange={(e) => handleFileUpload(e, mIdx, lIdx)}
+                          className="text-xs text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-rose-600 file:text-white hover:file:bg-rose-700"
+                        />
+                        {uploadingFile && <span className="text-xs text-amber-400">Uploading file...</span>}
+                        {lesson.pdf_url && <span className="text-xs text-green-400 truncate max-w-xs">PDF Ready: {lesson.pdf_url}</span>}
+                      </div>
+                    )}
+
+                    {lesson.content_type === 'text' && (
+                      <textarea
+                        rows="3"
+                        placeholder="Write or paste manual lesson notes/text content here..."
+                        value={lesson.text_content}
                         onChange={(e) => {
                           const updated = [...modules]
-                          updated[mIdx].lessons[lIdx].duration = e.target.value
+                          updated[mIdx].lessons[lIdx].text_content = e.target.value
                           setModules(updated)
                         }}
-                        className="w-full p-2 bg-black/40 border border-white/10 rounded-lg text-sm text-white"
+                        className="w-full p-2 bg-black/40 border border-white/10 rounded-lg text-sm text-white focus:outline-none"
                       />
-                    </div>
-                    <div className="md:col-span-1 text-center">
-                      {mod.lessons.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeLesson(mIdx, lIdx)}
-                          className="text-red-400 hover:text-red-300 text-xs"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
+                    )}
                   </div>
                 ))}
               </div>
 
-              {/* الاختبار (Quiz) الخاص بالموديل */}
+              {/* اختبار الموديل (Quiz) */}
               <div className="space-y-4 pl-4 border-l-2 border-teal-500/30 pt-2">
                 <h3 className="text-sm font-semibold text-teal-400 uppercase tracking-wider">Module Assessment (Quiz)</h3>
                 <input
@@ -492,7 +575,7 @@ export default function CreateCourse() {
           ))}
         </div>
 
-        {/* أزرار الحفظ والإلغاء */}
+        {/* أزرار الحفظ */}
         <div className="flex gap-4 pt-6 border-t border-white/10">
           <button
             type="submit"
