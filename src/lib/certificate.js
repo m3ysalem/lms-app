@@ -51,16 +51,10 @@ export async function downloadCertificatePdf(cert) {
     })
   }
 
-  // 2. اسم الكورس مع إضافة كلمة Course تلقائياً إذا لم تكن موجودة
+  // 2. اسم الكورس (يُطبع كما هو تماماً دون تكرار كلمة Course إذا كانت موجودة)
   if (cert.course_name) {
     const courseSize = 22
-    let courseText = cert.course_name.trim()
-    
-    // التحقق لمنع تكرار كلمة Course لو كانت مكتوبة مسبقاً
-    if (!courseText.toLowerCase().endsWith('course')) {
-      courseText = `${courseText} Course`
-    }
-
+    const courseText = cert.course_name.trim()
     const textWidth = font.widthOfTextAtSize(courseText, courseSize)
     
     safeDrawText(courseText, {
