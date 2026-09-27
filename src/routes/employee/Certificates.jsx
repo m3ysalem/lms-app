@@ -35,11 +35,7 @@ export default function Certificates() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {certs.map((c) => {
-// للتأكد من شكل البيانات اللي راجعة من الداتا بيز (افتح F12 واضغط على زر التحميل وشوف الـ Console)
-console.log("Certificate Item Object:", c);
-
-// استبدل السطر القديم بالسطر ده:
-const courseName = c.course?.name || c.course_name || c.name || c.title || c.course_title || (typeof c.course === 'string' ? c.course : 'اسم الكورس غير متوفر')
+const courseName = c.course?.name || c.course_name || c.name || 'Course Completion'
 
             return (
               <div key={c.id || c.cert_number} className="card p-5 flex flex-col justify-between bg-[#14181d]/85 border border-white/10 rounded-2xl backdrop-blur-xl text-white">
