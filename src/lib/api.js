@@ -47,19 +47,22 @@ export async function getMyProgressMap(employeeId) {
 
 export async function getMyCertificates(employeeId) {
   try {
-    const { data, error } = await supabase
+    const { data: certs, error } = await supabase
       .from('certificates')
-      .select('*, course:courses(name)')
+      .select('*')
       .eq('employee_id', employeeId)
 
-    if (error) {
-      const { data: fallbackData } = await supabase
-        .from('certificates')
-        .select('*')
-        .eq('employee_id', employeeId)
-      return fallbackData || []
-    }
-    return data || []
+    if (error) throw error
+    if (!certs || certs.length === 0) return []
+
+    // جلب جميع الكورسات لربط الأسماء الحقيقية بضمان 100%
+    const { data: courses } = await supabase.from('courses').select('id, name')
+    const courseMap = (courses || []).reduce((acc, c) => ({ ...acc, [c.id]: c.name }), {})
+
+    return certs.map(c => ({
+      ...c,
+      course_name: c.course_name || courseMap[c.course_id] || 'HSE'
+    }))
   } catch (err) {
     console.error('getMyCertificates error:', err)
     return []
