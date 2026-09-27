@@ -478,7 +478,7 @@ export async function listAssignments() {
   try {
     const { data, error } = await supabase
       .from('course_assignments')
-      .select('*, course:courses(name), employee:profiles(full_name, email)')
+      .select('*, course:courses(name), employee:profiles!inner(full_name, email)')
     if (error) throw error
     return data || []
   } catch (err) {
