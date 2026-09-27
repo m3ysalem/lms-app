@@ -20,7 +20,7 @@ export async function downloadCertificatePdf(cert) {
     console.warn('Template load failed:', err)
   }
 
-  // استخدام فونت فاخر ومودرن (TimesRomanBold) للاسم والكورس
+  // استخدام الفونتات الرسمية
   const font = await doc.embedFont(StandardFonts.TimesRomanBold)
   const bodyFont = await doc.embedFont(StandardFonts.Helvetica)
 
@@ -51,21 +51,10 @@ export async function downloadCertificatePdf(cert) {
     })
   }
 
-  // 2. إخفاء النص القديم المرسوم في الصورة عبر رسم مستطيل أبيض صغير مكانه (اختياري حسب تصميم صورتك)
-  page.drawRectangle({
-    x: 200,
-    y: 250,
-    width: 442,
-    height: 40,
-    color: rgb(1, 1, 1), // لون أبيض لتغطية الكلمة القديمة الثابتة في الصورة
-  })
-
-  // 3. اسم الكورس الحقيقي الديناميكي
+  // 2. اسم الكورس الحقيقي (يعرض كما هو دون إضافة كلمة course إجبارية إذا لم ترد)
   if (cert.course_name) {
     const courseSize = 22
-    let courseRaw = cert.course_name
-    
-    const courseText = courseRaw.toLowerCase().includes('course') ? courseRaw : `${courseRaw}`
+    const courseText = cert.course_name
     const textWidth = font.widthOfTextAtSize(courseText, courseSize)
     
     safeDrawText(courseText, {
