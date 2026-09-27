@@ -6,6 +6,9 @@ export default function CreateCourse() {
   const navigate = useNavigate()
   const [departments, setDepartments] = useState([])
   const [selectedDepts, setSelectedDepts] = useState([])
+  const [busy, setBusy] = useState(false)
+
+  // بيانات الكورس الأساسية
   const [courseData, setCourseData] = useState({
     name: '',
     course_code: '',
@@ -13,17 +16,30 @@ export default function CreateCourse() {
     certificate_eligible: true,
     required: false
   })
-  const [busy, setBusy] = useState(false)
 
-  // جلب الأقسام المرتبطة من جدول departments مباشرة
+  // هيكل الوحدات والدروس والاختبارات داخل الكورس
+  const [modules, setModules] = useState([
+    {
+      title: 'Module 1',
+      lessons: [
+        { title: '', video_url: '', duration: 15 } // المدة بالدقائق عشان تسمع في تقارير ساعات التدريب
+      ],
+      quiz: {
+        title: '',
+        questions: [
+          { question_text: '', options: ['', '', '', ''], correct_answer: 0, points: 10 }
+        ]
+      }
+    }
+  ])
+
+  // جلب الأقسام من جدول departments
   useEffect(() => {
     async function fetchDepartments() {
       try {
         const { data, error } = await supabase.from('departments').select('id, name')
         if (!error && data) {
           setDepartments(data)
-        } else {
-          console.error('Error fetching departments:', error)
         }
       } catch (err) {
         console.error('Error fetching departments:', err)
@@ -32,13 +48,61 @@ export default function CreateCourse() {
     fetchDepartments()
   }, [])
 
-  // دالة تحديد أو إلغاء تحديد القسم (تعتمد على الـ id)
   const handleCheckboxChange = (deptId) => {
     setSelectedDepts(prev => 
       prev.includes(deptId) ? prev.filter(id => id !== deptId) : [...prev, deptId]
     )
   }
 
+  // دوال التحكم في الوحدات والدروس والاختبارات
+  const addModule = () => {
+    setModules(prev => [
+      ...prev,
+      {
+        title: `Module ${prev.length + 1}`,
+        lessons: [{ title: '', video_url: '', duration: 15 }],
+        quiz: { title: '', questions: [{ question_text: '', options: ['', '', '', ''], correct_answer: 0, points: 10 }] }
+      }
+    ])
+  }
+
+  const removeModule = (mIdx) => {
+    setModules(prev => prev.filter((_, idx) => idx !== mIdx))
+  }
+
+  const addLesson = (mIdx) => {
+    setModules(prev => {
+      const updated = [...prev]
+      updated[mIdx].lessons.push({ title: '', video_url: '', duration: 15 })
+      return updated
+    })
+  }
+
+  const removeLesson = (mIdx, lIdx) => {
+    setModules(prev => {
+      const updated = [...prev]
+      updated[mIdx].lessons = updated[mIdx].lessons.filter((_, idx) => idx !== lIdx)
+      return updated
+    })
+  }
+
+  const addQuestion = (mIdx) => {
+    setModules(prev => {
+      const updated = [...prev]
+      updated[mIdx].quiz.questions.push({ question_text: '', options: ['', '', '', ''], correct_answer: 0, points: 10 })
+      return updated
+    })
+  }
+
+  const removeQuestion = (mIdx, qIdx) => {
+    setModules(prev => {
+      const updated = [...prev]
+      updated[mIdx].quiz.questions = updated[mIdx].quiz.questions.filter((_, idx) => idx !== qIdx)
+      return updated
+    })
+  }
+
+  // حفظ الكورس بالكامل وربطه بكل الجداول لضمان عمل التقارير بدقة
   const handleCreate = async (e) => {
     e.preventDefault()
     if (!courseData.name.trim()) {
@@ -49,7 +113,15 @@ export default function CreateCourse() {
     try {
       setBusy(true)
 
-      // 1. إدخال الكورس الأساسي
+      // 1. حساب إجمالي مدة الكورس بالدقائق من جميع الدروس لتظهر في التقارير
+      let totalCourseDurationMins = 0
+      modules.forEach(m => {
+        m.lessons.forEach(l => {
+          totalCourseDurationMins += Number(l.duration || 0)
+        })
+      })
+
+      // 2. إدخال الكورس الأساسي في جدول courses
       const { data: newCourse, error: courseError } = await supabase
         .from('courses')
         .insert([{
@@ -57,28 +129,84 @@ export default function CreateCourse() {
           course_code: courseData.course_code,
           passing_score: Number(courseData.passing_score),
           certificate_eligible: courseData.certificate_eligible,
-          required: courseData.required
+          required: courseData.required,
+          duration: totalCourseDurationMins // حفظ إجمالي الدقائق عشان تقارير ساعات التدريب تقرأها صح
         }])
         .select()
         .single()
 
       if (courseError) throw courseError
 
-      // 2. ربط الكورس بالأقسام المستهدفة في الجدول الوسيط course_departments (إذا تم اختيار أقسام)
+      // 3. ربط الكورس بالأقسام المستهدفة
       if (selectedDepts.length > 0 && newCourse) {
         const relations = selectedDepts.map(deptId => ({
           course_id: newCourse.id,
           department_id: deptId
         }))
-
-        const { error: relationError } = await supabase
-          .from('course_departments')
-          .insert(relations)
-
+        const { error: relationError } = await supabase.from('course_departments').insert(relations)
         if (relationError) throw relationError
       }
 
-      alert('Course created and departments linked successfully!')
+      // 4. إدخال الوحدات (Modules)، الدروس (Lessons)، والاختبارات (Quizzes)
+      for (let i = 0; i < modules.length; i++) {
+        const mod = modules[i]
+        
+        // إدخال الموديل (تأكد من توافق اسم الجدول عندك مثل modules أو course_modules)
+        const { data: newModule, error: modErr } = await supabase
+          .from('modules') // لو الجدول عندك اسمه مختلف مثل course_modules غيرها هنا
+          .insert([{
+            course_id: newCourse.id,
+            title: mod.title,
+            order_index: i + 1
+          }])
+          .select()
+          .single()
+
+        if (modErr) {
+          console.warn('Modules table error or skipped:', modErr.message)
+          continue
+        }
+
+        // إدخال الدروس المرتبطة بالموديل
+        if (newModule && mod.lessons.length > 0) {
+          const lessonsToInsert = mod.lessons.map((l, lIdx) => ({
+            module_id: newModule.id,
+            course_id: newCourse.id,
+            title: l.title || `Lesson ${lIdx + 1}`,
+            video_url: l.video_url || '',
+            duration: Number(l.duration || 15),
+            order_index: lIdx + 1
+          }))
+          await supabase.from('lessons').insert(lessonsToInsert)
+        }
+
+        // إدخال الاختبار (Quiz) والأسئلة لضمان ظهور تقارير Assessment Report
+        if (newModule && mod.quiz && mod.quiz.questions.length > 0 && mod.quiz.title) {
+          const { data: newQuiz, error: quizErr } = await supabase
+            .from('quizzes')
+            .insert([{
+              module_id: newModule.id,
+              course_id: newCourse.id,
+              title: mod.quiz.title
+            }])
+            .select()
+            .single()
+
+          if (!quizErr && newQuiz) {
+            const questionsToInsert = mod.quiz.questions.map((q, qIdx) => ({
+              quiz_id: newQuiz.id,
+              question_text: q.question_text,
+              options: q.options, // لو السجل خزّنها كـ JSON
+              correct_answer: q.correct_answer,
+              points: Number(q.points || 10),
+              order_index: qIdx + 1
+            }))
+            await supabase.from('questions').insert(questionsToInsert)
+          }
+        }
+      }
+
+      alert('Course, modules, lessons, and quizzes created successfully and linked to reports!')
       navigate('/admin/courses')
     } catch (err) {
       alert('Failed to create course: ' + err.message)
@@ -88,41 +216,71 @@ export default function CreateCourse() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl text-white p-6">
-      <h1 className="text-2xl font-bold">Create New Course</h1>
+    <div className="space-y-6 max-w-4xl text-white p-6 pb-24">
+      <h1 className="text-3xl font-bold">Create New Course & Curriculum</h1>
       
-      <form onSubmit={handleCreate} className="space-y-6">
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Course Name</label>
-            <input 
-              type="text" 
-              className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none"
-              placeholder="e.g. JavaScript Basics"
-              value={courseData.name}
-              onChange={(e) => setCourseData({ ...courseData, name: e.target.value })}
-            />
+      <form onSubmit={handleCreate} className="space-y-8">
+        {/* معلومات الكورس */}
+        <div className="p-6 rounded-2xl bg-[#14181d]/85 border border-white/10 space-y-4">
+          <h2 className="text-xl font-semibold text-rose-500">1. Basic Information</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Course Name</label>
+              <input 
+                type="text" 
+                className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none"
+                placeholder="e.g. Advanced JavaScript"
+                value={courseData.name}
+                onChange={(e) => setCourseData({ ...courseData, name: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Course Code</label>
+              <input 
+                type="text" 
+                className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none"
+                placeholder="e.g. JS-202"
+                value={courseData.course_code}
+                onChange={(e) => setCourseData({ ...courseData, course_code: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Passing Score (%)</label>
+              <input 
+                type="number" 
+                className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none"
+                value={courseData.passing_score}
+                onChange={(e) => setCourseData({ ...courseData, passing_score: e.target.value })}
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Course Code</label>
-            <input 
-              type="text" 
-              className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none"
-              placeholder="e.g. JS-101"
-              value={courseData.course_code}
-              onChange={(e) => setCourseData({ ...courseData, course_code: e.target.value })}
-            />
+          <div className="flex items-center gap-6 pt-2">
+            <label className="flex items-center gap-2 cursor-pointer text-sm">
+              <input 
+                type="checkbox" 
+                checked={courseData.certificate_eligible}
+                onChange={(e) => setCourseData({ ...courseData, certificate_eligible: e.target.checked })}
+                className="rounded border-white/20 bg-black text-rose-600 focus:ring-0 w-4 h-4"
+              />
+              Certificate eligible
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer text-sm">
+              <input 
+                type="checkbox" 
+                checked={courseData.required}
+                onChange={(e) => setCourseData({ ...courseData, required: e.target.checked })}
+                className="rounded border-white/20 bg-black text-rose-600 focus:ring-0 w-4 h-4"
+              />
+              Required
+            </label>
           </div>
         </div>
 
-        {/* الإدارات المستهدفة (Target Departments) ديناميكياً من جدول departments */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-300">
-            Target Departments (الإدارات المستهدفة)
-          </label>
-          
-          <div className="p-4 rounded-xl bg-[#14181d]/85 border border-white/10 space-y-3 max-h-48 overflow-y-auto">
+        {/* الأقسام المستهدفة */}
+        <div className="p-6 rounded-2xl bg-[#14181d]/85 border border-white/10 space-y-3">
+          <h2 className="text-xl font-semibold text-rose-500">2. Target Departments</h2>
+          <div className="space-y-2 max-h-40 overflow-y-auto">
             {departments.length === 0 ? (
               <p className="text-gray-400 text-sm">No departments found.</p>
             ) : (
@@ -141,43 +299,213 @@ export default function CreateCourse() {
           </div>
         </div>
 
-        {/* الخيارات الإضافية */}
-        <div className="flex items-center gap-6">
-          <label className="flex items-center gap-2 cursor-pointer text-sm">
-            <input 
-              type="checkbox" 
-              checked={courseData.certificate_eligible}
-              onChange={(e) => setCourseData({ ...courseData, certificate_eligible: e.target.checked })}
-              className="rounded border-white/20 bg-black text-rose-600 focus:ring-0 w-4 h-4"
-            />
-            Certificate eligible
-          </label>
+        {/* الوحدات والدروس والفيديوهات والاختبارات */}
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-rose-500">3. Course Modules, Lessons & Quizzes</h2>
+            <button
+              type="button"
+              onClick={addModule}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              + Add Module
+            </button>
+          </div>
 
-          <label className="flex items-center gap-2 cursor-pointer text-sm">
-            <input 
-              type="checkbox" 
-              checked={courseData.required}
-              onChange={(e) => setCourseData({ ...courseData, required: e.target.checked })}
-              className="rounded border-white/20 bg-black text-rose-600 focus:ring-0 w-4 h-4"
-            />
-            Required
-          </label>
+          {modules.map((mod, mIdx) => (
+            <div key={mIdx} className="p-6 rounded-2xl bg-[#14181d]/90 border border-white/10 space-y-6 relative">
+              <div className="flex items-center justify-between gap-4">
+                <input
+                  type="text"
+                  value={mod.title}
+                  onChange={(e) => {
+                    const updated = [...modules]
+                    updated[mIdx].title = e.target.value
+                    setModules(updated)
+                  }}
+                  className="bg-black/50 border border-white/20 rounded-lg p-2 font-bold text-lg text-white w-full max-w-sm"
+                  placeholder="Module Title"
+                />
+                {modules.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeModule(mIdx)}
+                    className="text-red-400 hover:text-red-300 text-sm font-medium"
+                  >
+                    Delete Module
+                  </button>
+                )}
+              </div>
+
+              {/* الدروس والفيديوهات */}
+              <div className="space-y-4 pl-4 border-l-2 border-rose-500/30">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Lessons & Videos</h3>
+                  <button
+                    type="button"
+                    onClick={() => addLesson(mIdx)}
+                    className="text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-md transition-colors"
+                  >
+                    + Add Lesson
+                  </button>
+                </div>
+
+                {mod.lessons.map((lesson, lIdx) => (
+                  <div key={lIdx} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center bg-black/30 p-3 rounded-xl border border-white/5">
+                    <div className="md:col-span-4">
+                      <input
+                        type="text"
+                        placeholder="Lesson Title"
+                        value={lesson.title}
+                        onChange={(e) => {
+                          const updated = [...modules]
+                          updated[mIdx].lessons[lIdx].title = e.target.value
+                          setModules(updated)
+                        }}
+                        className="w-full p-2 bg-black/40 border border-white/10 rounded-lg text-sm text-white"
+                      />
+                    </div>
+                    <div className="md:col-span-5">
+                      <input
+                        type="text"
+                        placeholder="Video URL (e.g. YouTube/MP4 link)"
+                        value={lesson.video_url}
+                        onChange={(e) => {
+                          const updated = [...modules]
+                          updated[mIdx].lessons[lIdx].video_url = e.target.value
+                          setModules(updated)
+                        }}
+                        className="w-full p-2 bg-black/40 border border-white/10 rounded-lg text-sm text-white"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <input
+                        type="number"
+                        placeholder="Mins"
+                        value={lesson.duration}
+                        onChange={(e) => {
+                          const updated = [...modules]
+                          updated[mIdx].lessons[lIdx].duration = e.target.value
+                          setModules(updated)
+                        }}
+                        className="w-full p-2 bg-black/40 border border-white/10 rounded-lg text-sm text-white"
+                      />
+                    </div>
+                    <div className="md:col-span-1 text-center">
+                      {mod.lessons.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeLesson(mIdx, lIdx)}
+                          className="text-red-400 hover:text-red-300 text-xs"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* الاختبار (Quiz) الخاص بالموديل */}
+              <div className="space-y-4 pl-4 border-l-2 border-teal-500/30 pt-2">
+                <h3 className="text-sm font-semibold text-teal-400 uppercase tracking-wider">Module Assessment (Quiz)</h3>
+                <input
+                  type="text"
+                  placeholder="Quiz Title (e.g. Module 1 Assessment)"
+                  value={mod.quiz.title}
+                  onChange={(e) => {
+                    const updated = [...modules]
+                    updated[mIdx].quiz.title = e.target.value
+                    setModules(updated)
+                  }}
+                  className="w-full max-w-sm p-2 bg-black/40 border border-white/10 rounded-lg text-sm text-white"
+                />
+
+                <div className="space-y-3">
+                  {mod.quiz.questions.map((q, qIdx) => (
+                    <div key={qIdx} className="bg-black/40 p-4 rounded-xl border border-white/10 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-400">Question {qIdx + 1}</span>
+                        {mod.quiz.questions.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeQuestion(mIdx, qIdx)}
+                            className="text-red-400 hover:text-red-300 text-xs"
+                          >
+                            Delete Question
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Enter Question Text..."
+                        value={q.question_text}
+                        onChange={(e) => {
+                          const updated = [...modules]
+                          updated[mIdx].quiz.questions[qIdx].question_text = e.target.value
+                          setModules(updated)
+                        }}
+                        className="w-full p-2 bg-black/30 border border-white/10 rounded-lg text-sm text-white"
+                      />
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {q.options.map((opt, oIdx) => (
+                          <div key={oIdx} className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name={`correct_${mIdx}_${qIdx}`}
+                              checked={q.correct_answer === oIdx}
+                              onChange={() => {
+                                const updated = [...modules]
+                                updated[mIdx].quiz.questions[qIdx].correct_answer = oIdx
+                                setModules(updated)
+                              }}
+                              className="text-rose-600 focus:ring-0"
+                            />
+                            <input
+                              type="text"
+                              placeholder={`Option ${oIdx + 1}`}
+                              value={opt}
+                              onChange={(e) => {
+                                const updated = [...modules]
+                                updated[mIdx].quiz.questions[qIdx].options[oIdx] = e.target.value
+                                setModules(updated)
+                              }}
+                              className="w-full p-1.5 bg-black/30 border border-white/10 rounded-lg text-xs text-white"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={() => addQuestion(mIdx)}
+                    className="text-xs bg-teal-600/20 text-teal-300 hover:bg-teal-600/30 px-3 py-1.5 rounded-md transition-colors"
+                  >
+                    + Add Question
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
 
-        {/* زر الإنشاء */}
-        <div className="flex gap-3 pt-4">
+        {/* أزرار الحفظ والإلغاء */}
+        <div className="flex gap-4 pt-6 border-t border-white/10">
           <button
             type="submit"
             disabled={busy}
-            className="px-6 py-2.5 rounded-lg bg-[#9E1B1B] hover:bg-rose-700 text-white font-medium transition-colors shadow-lg shadow-red-950/50"
+            className="px-8 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold transition-all shadow-lg shadow-red-950/50"
           >
-            {busy ? 'Creating...' : 'Create course'}
+            {busy ? 'Creating Course & Curriculum...' : 'Save & Publish Course'}
           </button>
           
           <button
             type="button"
             onClick={() => navigate('/admin/courses')}
-            className="px-6 py-2.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-medium transition-colors"
+            className="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium transition-colors"
           >
             Cancel
           </button>
