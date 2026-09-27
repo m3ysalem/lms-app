@@ -35,7 +35,11 @@ export default function Certificates() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {certs.map((c) => {
-const courseName = c.course?.name || c.course_name || c.name || 'Course Completion'
+            // جلب اسم الكورس الفعلي بشكل دقيق وحمايته
+            const courseName = c.course?.name || c.course_name || c.name || 'Course Completion'
+            
+            // تعريف اسم الموظف محلياً داخل اللوب لضمان عدم حدوث خطأ
+            const employeeName = profile?.full_name || profile?.name || c.employee_name || 'Employee'
 
             return (
               <div key={c.id || c.cert_number} className="card p-5 flex flex-col justify-between bg-[#14181d]/85 border border-white/10 rounded-2xl backdrop-blur-xl text-white">
