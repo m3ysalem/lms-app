@@ -51,10 +51,16 @@ export async function downloadCertificatePdf(cert) {
     })
   }
 
-  // 2. اسم الكورس الحقيقي (يعرض كما هو دون إضافة كلمة course إجبارية إذا لم ترد)
+  // 2. اسم الكورس مع إضافة كلمة Course تلقائياً إذا لم تكن موجودة
   if (cert.course_name) {
     const courseSize = 22
-    const courseText = cert.course_name
+    let courseText = cert.course_name.trim()
+    
+    // التحقق لمنع تكرار كلمة Course لو كانت مكتوبة مسبقاً
+    if (!courseText.toLowerCase().endsWith('course')) {
+      courseText = `${courseText} Course`
+    }
+
     const textWidth = font.widthOfTextAtSize(courseText, courseSize)
     
     safeDrawText(courseText, {
