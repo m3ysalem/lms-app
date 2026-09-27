@@ -17,6 +17,7 @@ import AdminEmployees from './routes/admin/Employees'
 import AdminCourses from './routes/admin/Courses'
 import AdminCourseBuilder from './routes/admin/CourseBuilder'
 import AdminAssignments from './routes/admin/Assignments'
+import AdminReports from './pages/admin/AdminReports' // <--- 1. استيراد صفحة التقارير الجديدة
 
 export default function App() {
   return (
@@ -34,6 +35,7 @@ export default function App() {
 
       {/* Admin-only */}
       <Route path="/admin" element={<RequireAuth><RequireAdmin><Layout><AdminDashboard /></Layout></RequireAdmin></RequireAuth>} />
+      <Route path="/admin/reports" element={<RequireAuth><RequireAdmin><Layout><AdminReports /></Layout></RequireAdmin></RequireAuth>} /> {/* <--- 2. إضافة مسار التقارير هنا */}
       <Route path="/admin/employees" element={<RequireAuth><RequireAdmin><Layout><AdminEmployees /></Layout></RequireAdmin></RequireAuth>} />
       <Route path="/admin/courses" element={<RequireAuth><RequireAdmin><Layout><AdminCourses /></Layout></RequireAdmin></RequireAuth>} />
       <Route path="/admin/courses/:courseId" element={<RequireAuth><RequireAdmin><Layout><AdminCourseBuilder /></Layout></RequireAdmin></RequireAuth>} />
