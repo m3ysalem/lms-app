@@ -102,7 +102,7 @@ export default function CreateCourse() {
     try {
       setUploadingFile(true)
       const fileExt = file.name.split('.').pop()
-      const fileName = `${Math.random().toString(36.substring(2))}_${Date.now()}.${fileExt}`
+      const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`
       const filePath = `course_files/${fileName}`
 
       // تأكد أن الـ bucket اسمه course-files أو قم بتعديله حسب الموجود عندك
