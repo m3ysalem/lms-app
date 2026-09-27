@@ -50,7 +50,7 @@ export default function AdminCourses() {
 
       if (error) throw error
       setCourseModules(mods || [])
-    } addCatch (err) {
+    } catch (err) {
       console.error(err)
       setCourseModules([])
     } finally {
