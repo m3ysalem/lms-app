@@ -20,7 +20,7 @@ export default function AdminCourses() {
     listTrainers().then(setTrainers)
   }, [])
 
-  // دالة لتغيير حالة الكورس (Published / Draft) مباشرة من القائمة
+  // دالة لتغيير حالة الكورس (Published / Draft) مباشرة من القائمة المنسدلة السريعة
   const handleStatusChange = async (courseId, newStatus) => {
     try {
       const { error } = await supabase
@@ -65,6 +65,7 @@ export default function AdminCourses() {
           <h1 className="text-2xl font-bold">Courses</h1>
           <p className="text-muted mt-1">{courses.length} courses</p>
         </div>
+        {/* زر إنشاء كورس جديد يوجهك لشاشة الإنشاء الشاملة */}
         <button 
           className="btn-primary" 
           onClick={() => navigate('/admin/courses/new')}
@@ -76,7 +77,7 @@ export default function AdminCourses() {
       <div className="card divide-y divide-surface-border">
         {courses.map((c) => (
           <div key={c.id} className="p-4 flex items-center justify-between hover:bg-surface transition-colors">
-            {/* الضغط هنا يفتح تفاصيل الكورس أو صفحة التعديل */}
+            {/* الضغط على اسم الكورس يوجهك لصفحة تفاصيل الكورس */}
             <div 
               className="cursor-pointer flex-1"
               onClick={() => navigate(`/admin/courses/${c.id}`)}
@@ -88,24 +89,23 @@ export default function AdminCourses() {
             <div className="flex items-center gap-3">
               {c.is_required && <Badge tone="warning">Required</Badge>}
               
-              {/* قائمة منسدلة سريعة لتغيير حالة الكورس (Draft / Published) */}
+              {/* قائمة منسدلة سريعة لتغيير حالة الكورس (Draft / Published) بدون الدخول للصفحة */}
               <select
                 value={c.status || 'draft'}
                 onChange={(e) => handleStatusChange(c.id, e.target.value)}
-                onClick={(e) => e.stopPropagation()} // لمنع فتح صفحة التفاصيل عند الضغط على القائمة
+                onClick={(e) => e.stopPropagation()}
                 className="text-xs p-1.5 rounded bg-black/30 border border-white/20 text-white cursor-pointer focus:outline-none"
               >
                 <option value="draft">Draft</option>
                 <option value="published">Published</option>
               </select>
 
-              {/* زر التعديل (Edit) الموجه لصفحة التعديل */}
+              {/* زر التعديل (Edit) الموجه لصفحة تفاصيل أو تعديل الكورس */}
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  // لو عندك مسار خاص بالتعديل زي /admin/courses/edit/${c.id} غيره هنا، أو اتركه حسب مسار صفحة التعديل عندك
-                  navigate(`/admin/courses/${c.id}/edit`) 
+                  navigate(`/admin/courses/${c.id}`)
                 }}
                 className="px-3 py-1 text-xs font-medium bg-blue-500/10 text-blue-600 hover:bg-blue-500 hover:text-white rounded-lg transition-colors border border-blue-500/20"
                 title="Edit Course Details"
