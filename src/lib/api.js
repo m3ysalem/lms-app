@@ -162,22 +162,21 @@ export async function getCourseWithStructure(courseId) {
 
     if (courseError) throw courseError
 
-    // استخدام sort_order بدلاً من order_index لمنع أخطاء قاعدة البيانات
+    // جلب المديولات المرتبطة بالكورس
     const { data: modules, error: modError } = await supabase
       .from('modules')
       .select('*')
       .eq('course_id', courseId)
-      .order('sort_order', { ascending: true })
 
     if (modError) throw modError
 
+    // جلب الدروس لكل مديول بشكل مباشر لضمان ظهورها بدون عوائق
     const modulesWithDetails = await Promise.all(
       (modules || []).map(async (mod) => {
         const { data: lessons, error: lessonError } = await supabase
           .from('lessons')
           .select('*')
           .eq('module_id', mod.id)
-          .order('sort_order', { ascending: true })
 
         if (lessonError) {
           console.error('Error fetching lessons for module:', mod.id, lessonError)
