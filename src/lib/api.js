@@ -3,7 +3,6 @@ import { supabase } from './supabaseClient'
 // ---------- Employee: assignments & progress ----------
 export async function getMyAssignments(employeeId) {
   try {
-    // 1. جلب التعيينات الخاصة بالمستخدم
     const { data: assignments, error } = await supabase
       .from('course_assignments')
       .select('*')
@@ -11,7 +10,6 @@ export async function getMyAssignments(employeeId) {
 
     if (error) throw error
 
-    // 2. جلب التقدم الخاص بالمستخدم لضمان ظهور الكورسات التي بدأها من الكتالوج حتى لو لم تُعنَ له
     const { data: progressList } = await supabase
       .from('course_progress')
       .select('*')
@@ -25,11 +23,9 @@ export async function getMyAssignments(employeeId) {
 
     if (allCourseIdsSet.size === 0) return []
 
-    // جلب جميع الكورسات دفعة واحدة لتفادي أي أخطاء في علاقات الـ Foreign Key وإظهار الأسماء الحقيقية
     const { data: courses } = await supabase.from('courses').select('id, name, duration')
     const courseMap = (courses || []).reduce((acc, c) => ({ ...acc, [c.id]: c }), {})
 
-    // دمج التعيينات والتقدم معاً في قائمة موحدة للموظف
     const combinedList = Array.from(allCourseIdsSet).map(courseId => {
       const existingAssignment = assignedMap.get(courseId)
       const prog = (progressList || []).find(p => p.course_id === courseId)
@@ -40,7 +36,6 @@ export async function getMyAssignments(employeeId) {
           course: courseMap[courseId] || { name: 'Unknown Course' }
         }
       } else {
-        // إنشاء عنصر افتراضي للكورس الذي بدأه الموظف من الكتالوج ولم يُعنَ له مسبقاً
         const isCompleted = prog && prog.progress_percent >= 100
         return {
           id: `prog-${courseId}`,
@@ -90,7 +85,6 @@ export async function getMyCertificates(employeeId) {
     if (error) throw error
     if (!certs || certs.length === 0) return []
 
-    // جلب جميع الكورسات لربط الأسماء الحقيقية بضمان 100%
     const { data: courses } = await supabase.from('courses').select('id, name')
     const courseMap = (courses || []).reduce((acc, c) => ({ ...acc, [c.id]: c.name }), {})
 
@@ -169,7 +163,7 @@ export async function getCourseWithStructure(courseId) {
 
     if (courseError) throw courseError
 
-    // 2. جلب المديولات الخاصة بالكورس يدوياً بالاعتماد على عمود id الصحيح
+    // 2. جلب المديولات الخاصة بالكورس مرتبة حسب sort_order
     const { data: modules, error: modError } = await supabase
       .from('modules')
       .select('*')
@@ -181,11 +175,16 @@ export async function getCourseWithStructure(courseId) {
     // 3. جلب الدروس والاختبارات لكل مديول بناءً على الـ id الخاص بالمديول
     const modulesWithDetails = await Promise.all(
       (modules || []).map(async (mod) => {
-        // جلب الدروس
-        const { data: lessons } = await supabase
+        // جلب الدروس باستخدام module_id المطابق لـ mod.id
+        const { data: lessons, error: lessonError } = await supabase
           .from('lessons')
           .select('*')
-          .eq('module_id', mod.id) // الاعتماد على id المديول الصحيح
+          .eq('module_id', mod.id)
+          .order('sort_order', { ascending: true })
+
+        if (lessonError) {
+          console.error('Error fetching lessons for module:', mod.id, lessonError)
+        }
 
         // جلب الاختبارات والأسئلة التابعة لها
         const { data: quizzes } = await supabase
@@ -194,7 +193,7 @@ export async function getCourseWithStructure(courseId) {
             *,
             questions:quiz_questions (*)
           `)
-          .eq('module_id', mod.id) // الاعتماد على id المديول الصحيح
+          .eq('module_id', mod.id)
 
         return {
           ...mod,
