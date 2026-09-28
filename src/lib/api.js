@@ -169,25 +169,44 @@ export async function getCourseWithStructure(courseId) {
 
     if (courseError) throw courseError
 
-    // 2. جلب المديولات والدروس والاختبارات المرتبطة بالكورس
+    // 2. جلب المديولات الخاصة بالكورس يدوياً وبشكل منفصل لتفادي أخطاء الـ Schema Cache
     const { data: modules, error: modError } = await supabase
       .from('modules')
-      .select(`
-        *,
-        lessons (*),
-        quizzes (
-          *,
-          questions (*)
-        )
-      `)
+      .select('*')
       .eq('course_id', courseId)
-      .order('order_index', { ascending: true })
+      .order('sort_order', { ascending: true })
 
     if (modError) throw modError
 
+    // 3. جلب الدروس والاختبارات لكل مديول على حدة
+    const modulesWithDetails = await Promise.all(
+      (modules || []).map(async (mod) => {
+        // جلب الدروس
+        const { data: lessons } = await supabase
+          .from('lessons')
+          .select('*')
+          .eq('module_id', mod.id)
+
+        // جلب الاختبارات والأسئلة التابعة لها
+        const { data: quizzes } = await supabase
+          .from('quizzes')
+          .select(`
+            *,
+            questions:quiz_questions (*)
+          `)
+          .eq('module_id', mod.id)
+
+        return {
+          ...mod,
+          lessons: lessons || [],
+          quizzes: quizzes || []
+        }
+      })
+    )
+
     return {
       course,
-      modules: modules || []
+      modules: modulesWithDetails
     }
   } catch (err) {
     console.error('getCourseWithStructure error:', err)
