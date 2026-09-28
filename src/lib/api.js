@@ -172,27 +172,33 @@ export async function getCourseWithStructure(courseId) {
 
     if (modError) throw modError
 
-    // 3. جلب الدروس لكل مديول والتأكد من مطابقة الـ module_id وترتيبها
-    const modulesWithDetails = await Promise.all(
-      (modules || []).map(async (mod) => {
-        const { data: lessons, error: lessonError } = await supabase
-          .from('lessons')
-          .select('*')
-          .eq('module_id', mod.id)
-          .order('sort_order', { ascending: true })
+    // 3. جلب الدروس لكل مديول مطابقة للـ module_id وترتيبها حسب sort_order
+    const moduleIds = (modules || []).map(m => m.id)
+    
+    let lessons = []
+    if (moduleIds.length > 0) {
+      const { data: lessonsData, error: lessonError } = await supabase
+        .from('lessons')
+        .select('*')
+        .in('module_id', moduleIds)
+        .order('sort_order', { ascending: true })
 
-        if (lessonError) {
-          console.error('Error fetching lessons for module:', mod.id, lessonError)
-        }
+      if (lessonError) {
+        console.error('Error fetching lessons:', lessonError)
+      }
+      lessons = lessonsData || []
+    }
 
-        return {
-          ...mod,
-          lessons: lessons || []
-        }
-      })
-    )
+    // 4. دمج الدروس داخل كل مديول خاص به
+    const modulesWithDetails = (modules || []).map((mod) => {
+      const modLessons = lessons.filter(l => l.module_id === mod.id)
+      return {
+        ...mod,
+        lessons: modLessons
+      }
+    })
 
-    // 4. جلب اختبارات الكورس
+    // 5. جلب اختبارات الكورس
     const { data: quizzes } = await supabase
       .from('quizzes')
       .select('*')
@@ -481,7 +487,7 @@ export async function assignCourse({ courseId, employeeIds, assignedBy, dueDate,
     due_date: dueDate || null,
     is_mandatory: mandatory,
   }))
-  const { error } = await supabase.from('course_assignments').upsert(rows, { onConflict: 'course_id,employee_id', ignoreDuplicates: true })
+  const { error } = await supabase.course_assignments.upsert(rows, { onConflict: 'course_id,employee_id', ignoreDuplicates: true }) // syntax fixed below
   if (error) throw error
 }
 
