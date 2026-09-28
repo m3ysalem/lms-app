@@ -157,6 +157,7 @@ export async function getPublishedCourses(employeeId) {
     return [];
   }
 }
+
 export async function getCourseWithStructure(courseId) {
   try {
     // 1. جلب بيانات الكورس الأساسية
@@ -188,23 +189,6 @@ export async function getCourseWithStructure(courseId) {
       course,
       modules: modules || []
     }
-  } catch (err) {
-    console.error('getCourseWithStructure error:', err)
-    throw err
-  }
-}
-    const formattedModules = (modules || []).map((m) => ({
-      ...m,
-      lessons: allLessons.filter(l => l.module_id === m.id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
-    }))
-
-    const { data: quiz } = await supabase
-      .from('quizzes')
-      .select('*')
-      .eq('course_id', courseId)
-      .maybeSingle()
-
-    return { course, modules: formattedModules, quiz: quiz || null }
   } catch (err) {
     console.error('getCourseWithStructure error:', err)
     throw err
