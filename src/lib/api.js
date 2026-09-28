@@ -162,11 +162,12 @@ export async function getCourseWithStructure(courseId) {
 
     if (courseError) throw courseError
 
+    // استخدام sort_order بدلاً من order_index لمنع أخطاء قاعدة البيانات
     const { data: modules, error: modError } = await supabase
       .from('modules')
       .select('*')
       .eq('course_id', courseId)
-      .order('order_index', { ascending: true })
+      .order('sort_order', { ascending: true })
 
     if (modError) throw modError
 
@@ -176,7 +177,7 @@ export async function getCourseWithStructure(courseId) {
           .from('lessons')
           .select('*')
           .eq('module_id', mod.id)
-          .order('order_index', { ascending: true })
+          .order('sort_order', { ascending: true })
 
         if (lessonError) {
           console.error('Error fetching lessons for module:', mod.id, lessonError)
