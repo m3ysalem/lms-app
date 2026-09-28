@@ -23,14 +23,27 @@ export default function Courses() {
         if (profile?.department_id) {
           query = query.or(`department_id.eq.${profile.department_id},department_id.is.null`)
         } else {
-          // لو ملوش إدارة مسجلة، اظهر الكورسات العامة فقط
+          // لو لسه الprofile بيحمل أو ملوش إدارة مسجلة، اظهر الكورسات العامة فقط كبداية
           query = query.is('department_id', null)
         }
 
         const { data, error } = await query.order('created_at', { ascending: false })
 
         if (error) throw error
-        setCourses(data || [])
+        
+        // لو مفيش كورسات رجعت والإدارة موجودة، نجرب نجيب كل الكورسات المنشورة كحل احتياطي (Fallback)
+        if ((!data || data.length === 0) && profile?.department_id) {
+          const { data: fallbackData } = await supabase
+            .from('courses')
+            .select('*')
+            .eq('status', 'published')
+            .order('created_at', { ascending: false })
+          
+          setCourses(fallbackData || [])
+        } else {
+          setCourses(data || [])
+        }
+
       } catch (err) {
         setError(err.message)
       } finally {
@@ -38,9 +51,8 @@ export default function Courses() {
       }
     }
 
-    if (profile) {
-      fetchCourses()
-    }
+    // تم إزالة الشرط الصارم لضمان عمل الكويري حتى لو تأخر تحميل الـ profile قليلاً
+    fetchCourses()
   }, [profile])
 
   if (loading) return <div className="flex justify-center p-12"><Spinner /></div>
