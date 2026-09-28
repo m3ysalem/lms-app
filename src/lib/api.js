@@ -161,53 +161,39 @@ export async function getCourseWithStructure(courseId) {
       .single()
 
     if (!course) {
-      course = { id: courseId, name: 'QQQ', description: 'Course Details' }
+      const { data: allCourses } = await supabase.from('courses').select('*').limit(1)
+      course = allCourses ? allCourses[0] : { id: courseId, name: 'Course' }
     }
 
+    // جلب كل المديولات المتاحة في قاعدة البيانات
     let { data: modules } = await supabase
       .from('modules')
       .select('*')
-      .eq('course_id', courseId)
+      .order('sort_order', { ascending: true })
 
-    if (!modules || modules.length === 0) {
-      const { data: allMods } = await supabase.from('modules').select('*')
-      modules = allMods || []
-    }
+    modules = modules || []
 
-    let { data: lessons } = await supabase.from('lessons').select('*')
+    // جلب كل الدروس المتاحة في قاعدة البيانات
+    let { data: lessons } = await supabase
+      .from('lessons')
+      .select('*')
+      .order('sort_order', { ascending: true })
+
     lessons = lessons || []
 
-    // استخدام UUID سليم بدلاً من النصوص الوهمية لمنع خطأ 22P02
-    if (modules.length === 0) {
-      modules = [{
-        id: '11111111-1111-1111-1111-111111111111',
-        title: 'الوحدة الأولى (محتوى تجريبي)',
-        sort_order: 1
-      }]
-    }
-
-    if (lessons.length === 0) {
-      lessons = [{
-        id: '22222222-2222-2222-2222-222222222222',
-        module_id: modules[0].id,
-        title: 'الدرس الأول: مقدمة الكورس',
-        body: 'هذا محتوى تجريبي للدرس لأن الجدول فارغ في قاعدة البيانات.',
-        sort_order: 1
-      }]
-    }
-
-    const finalModules = modules.map((mod, idx) => {
+    // ربط الدروس بالمديولات الخاصة بها
+    const finalModules = modules.map(mod => {
       const modLessons = lessons.filter(l => l.module_id === mod.id)
-      if (modLessons.length === 0 && idx === 0) {
-        return { ...mod, lessons: lessons }
+      return {
+        ...mod,
+        lessons: modLessons.length > 0 ? modLessons : lessons.filter(l => !l.module_id)
       }
-      return { ...mod, lessons: modLessons }
     })
 
+    // جلب اختبارات الكورس
     const { data: quizzes } = await supabase
       .from('quizzes')
       .select('*')
-      .eq('course_id', courseId)
 
     return {
       course,
@@ -217,12 +203,8 @@ export async function getCourseWithStructure(courseId) {
   } catch (err) {
     console.error('getCourseWithStructure error:', err)
     return {
-      course: { name: 'QQQ' },
-      modules: [{
-        id: '11111111-1111-1111-1111-111111111111',
-        title: 'محتوى الكورس',
-        lessons: [{ id: '22222222-2222-2222-2222-222222222222', title: 'الدرس الرئيسي', body: 'مرحباً بك في الكورس' }]
-      }],
+      course: { name: 'Course' },
+      modules: [],
       quizzes: []
     }
   }
@@ -248,9 +230,6 @@ export async function getLessonProgress(employeeId, courseId) {
 }
 
 export async function markLessonComplete(employeeId, lessonId) {
-  // تجاهل حفظ التقدم للدروس التجريبية الوهمية لعدم التسبب بأخطاء
-  if (lessonId === '22222222-2222-2222-2222-222222222222') return;
-
   const { error } = await supabase
     .from('lesson_progress')
     .upsert(
