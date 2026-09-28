@@ -191,12 +191,13 @@ export default function CreateCourse() {
       for (let i = 0; i < modules.length; i++) {
         const mod = modules[i]
         
+        // تم استبدال order_index بـ sort_order لتجنب الخطأ
         const { data: newModule, error: modErr } = await supabase
           .from('modules')
           .insert([{
             course_id: newCourse.id,
             title: mod.title,
-            order_index: i + 1
+            sort_order: i + 1
           }])
           .select()
           .single()
@@ -213,7 +214,7 @@ export default function CreateCourse() {
             text_content: l.content_type === 'text' ? l.text_content : '',
             body: l.content_type === 'text' ? l.text_content : (l.content_type === 'video' ? l.video_url : l.pdf_url),
             duration: Number(l.duration || 15),
-            order_index: lIdx + 1
+            sort_order: lIdx + 1
           }))
           await supabase.from('lessons').insert(lessonsToInsert)
         }
