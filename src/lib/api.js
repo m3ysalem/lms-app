@@ -172,10 +172,9 @@ export async function getCourseWithStructure(courseId) {
 
     if (modError) throw modError
 
-    // 3. جلب الدروس والاختبارات لكل مديول بناءً على الـ id الصحيح للمديول
+    // 3. جلب الدروس لكل مديول والاختبارات التابعة للكورس
     const modulesWithDetails = await Promise.all(
       (modules || []).map(async (mod) => {
-        // جلب الدروس باستخدام module_id المطابق لـ mod.id
         const { data: lessons, error: lessonError } = await supabase
           .from('lessons')
           .select('*')
@@ -186,23 +185,23 @@ export async function getCourseWithStructure(courseId) {
           console.error('Error fetching lessons for module:', mod.id, lessonError)
         }
 
-        // جلب الاختبارات التابعة للكورس أو المرتبطة بالمديول حسب النظام
-        const { data: quizzes } = await supabase
-          .from('quizzes')
-          .select('*')
-          .eq('course_id', courseId)
-
         return {
           ...mod,
-          lessons: lessons || [],
-          quizzes: quizzes || []
+          lessons: lessons || []
         }
       })
     )
 
+    // جلب الاختبارات التابعة للكورس بشكل منفصل ومباشر
+    const { data: quizzes } = await supabase
+      .from('quizzes')
+      .select('*')
+      .eq('course_id', courseId)
+
     return {
       course,
-      modules: modulesWithDetails
+      modules: modulesWithDetails,
+      quizzes: quizzes || []
     }
   } catch (err) {
     console.error('getCourseWithStructure error:', err)
@@ -312,7 +311,6 @@ export async function getQuizQuestions(quizId) {
 
     if (qError || !qData) return []
 
-    // التعامل مع خيارات الـ jsonb والـ correct_answer الموجودة في الجدول مباشرة
     return qData.map(q => {
       let parsedOptions = []
       try {
