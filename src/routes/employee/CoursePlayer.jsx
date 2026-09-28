@@ -40,7 +40,7 @@ export default function CoursePlayer() {
       .then(([d, lp, certs]) => {
         setData(d)
         setLessonProgress(lp || {})
-        setCertificate(certs?.find((c) => c.course?.id === courseId) || null)
+        setCertificate(certs?.find((c) => c.course?.id === courseId || c.course_id === courseId) || null)
         const allL = d.modules?.flatMap((m) => m.lessons) || []
         const firstIncomplete = allL.find((l) => lp?.[l.id]?.status !== 'completed')
         setActiveLessonId(firstIncomplete?.id ?? allL[0]?.id ?? null)
@@ -59,16 +59,23 @@ export default function CoursePlayer() {
 
   const completeAndAdvance = async () => {
     if (!activeLesson) return
-    await markLessonComplete(profile.id, activeLesson.id)
-    const newLp = { ...lessonProgress, [activeLesson.id]: { status: 'completed' } }
-    setLessonProgress(newLp)
-    const newCompleted = allLessons.filter((l) => newLp[l.id]?.status === 'completed').length
-    const newPercent = Math.round((newCompleted / allLessons.length) * 100)
-    await upsertCourseProgress(profile.id, courseId, newPercent)
+    try {
+      await markLessonComplete(profile.id, activeLesson.id)
+      const newLp = { ...lessonProgress, [activeLesson.id]: { status: 'completed' } }
+      setLessonProgress(newLp)
+      
+      const newCompleted = allLessons.filter((l) => newLp[l.id]?.status === 'completed').length
+      const newPercent = allLessons.length ? Math.round((newCompleted / allLessons.length) * 100) : 0
+      
+      // تحديث نسبة التقدم والوقت المستهلك في الكورس لتظهر في تقارير الأدمن فوراً
+      await upsertCourseProgress(profile.id, courseId, newPercent)
 
-    const idx = allLessons.findIndex((l) => l.id === activeLesson.id)
-    const next = allLessons[idx + 1]
-    if (next) setActiveLessonId(next.id)
+      const idx = allLessons.findIndex((l) => l.id === activeLesson.id)
+      const next = allLessons[idx + 1]
+      if (next) setActiveLessonId(next.id)
+    } catch (err) {
+      console.error('Failed to update progress:', err)
+    }
   }
 
   if (error) return <div className="text-danger p-4">{error}</div>
@@ -113,7 +120,7 @@ export default function CoursePlayer() {
             </div>
           ))}
           
-          {/* زر الاختبار بتصميم متناسق مع الدارك مود */}
+          {/* زر الاختبار */}
           <Link
             to={`/courses/${courseId}/quiz`}
             style={{ backgroundColor: '#0d9488', display: 'block', marginTop: '16px', padding: '10px 12px', borderRadius: '8px', textAlign: 'center', textDecoration: 'none' }}
@@ -131,13 +138,13 @@ export default function CoursePlayer() {
               <h2 className="font-head text-xl font-semibold mb-4 text-white">{activeLesson.title}</h2>
 
               {activeLesson.content_type === 'text' && (
-                <p className="text-ink-300 leading-relaxed whitespace-pre-line">{activeLesson.body}</p>
+                <p className="text-ink-300 leading-relaxed whitespace-pre-line">{activeLesson.body || activeLesson.text_content}</p>
               )}
-              {(activeLesson.content_type === 'video' || activeLesson.content_type === 'external_video') && activeLesson.video_url && (
+              {(activeLesson.content_type === 'video' || activeLesson.content_type === 'external_video') && (activeLesson.video_url || activeLesson.body) && (
                 <div className="aspect-video bg-ink-900 rounded overflow-hidden mb-4">
                   <iframe 
                     title={activeLesson.title} 
-                    src={getEmbedUrl(activeLesson.video_url)} 
+                    src={getEmbedUrl(activeLesson.video_url || activeLesson.body)} 
                     className="w-full h-full" 
                     allowFullScreen 
                   />
@@ -153,9 +160,9 @@ export default function CoursePlayer() {
                   <p className="text-sm text-muted">
                     Attached material ({activeLesson.content_type.toUpperCase()}):
                   </p>
-                  {activeLesson.body ? (
+                  {(activeLesson.pdf_url || activeLesson.body) ? (
                     <a
-                      href={activeLesson.body}
+                      href={activeLesson.pdf_url || activeLesson.body}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal text-white font-medium hover:opacity-90 transition-opacity text-sm"
@@ -169,7 +176,6 @@ export default function CoursePlayer() {
               )}
 
               <div className="flex items-center justify-between mt-8 pt-4 border-t border-surface-border">
-                {/* زر السابق بتصميم مريح للعين في الدارك مود */}
                 <button
                   style={{ backgroundColor: '#374151', padding: '8px 16px', borderRadius: '6px', border: 'none', cursor: 'pointer' }}
                   disabled={allLessons.findIndex((l) => l.id === activeLesson.id) === 0}
