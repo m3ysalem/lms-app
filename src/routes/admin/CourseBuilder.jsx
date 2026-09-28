@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+\import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 
@@ -164,12 +164,11 @@ export default function CreateCourse() {
         })
       })
 
-      // 1. إنشاء الكورس الأساسي مع الحقول المطلوبة للتقارير
+      // 1. إنشاء الكورس الأساسي (تمت إزالة عمود title الذي كان يسبب المشكلة)
       const { data: newCourse, error: courseError } = await supabase
         .from('courses')
         .insert([{
           name: courseData.name,
-          title: courseData.name,
           course_code: courseData.course_code,
           passing_score: Number(courseData.passing_score),
           certificate_eligible: courseData.certificate_eligible,
@@ -190,7 +189,7 @@ export default function CreateCourse() {
         await supabase.from('course_departments').insert(relations)
       }
 
-      // 2. تكرار وإدخال المديولات، الدروس، والاختبارات مع ضبط الترتيب وارتباطات الـ IDs
+      // 2. إدخال المديولات، الدروس، والاختبارات
       for (let i = 0; i < modules.length; i++) {
         const mod = modules[i]
         
@@ -244,7 +243,7 @@ export default function CreateCourse() {
               options: q.options,
               correct_answer: q.correct_answer,
               points: Number(q.points || 10),
-              sort_order: qIdx + 1 // تم توحيد الترتيب بـ sort_order لضمان التوافق مع التقارير وقاعدة البيانات
+              sort_order: qIdx + 1
             }))
             const { error: qErr } = await supabase.from('quiz_questions').insert(questionsToInsert)
             if (qErr) console.error('Quiz questions insert error:', qErr)
