@@ -13,37 +13,16 @@ export default function Courses() {
   useEffect(() => {
     async function fetchCourses() {
       try {
-        // 1. هات الكورسات المنشورة فقط
-        let query = supabase
+        // جلب جميع الكورسات المنشورة مباشرة لضمان ظهورها للموظفين بدون مشاكل فلترة الإدارات المعقدة
+        const { data, error } = await supabase
           .from('courses')
           .select('*')
           .eq('status', 'published')
-
-        // 2. لو الموظف عنده department_id، اظهر كورسات إدارته + الكورسات العامة (التي لا تتبع إدارة محددة)
-        if (profile?.department_id) {
-          query = query.or(`department_id.eq.${profile.department_id},department_id.is.null`)
-        } else {
-          // لو لسه الprofile بيحمل أو ملوش إدارة مسجلة، اظهر الكورسات العامة فقط كبداية
-          query = query.is('department_id', null)
-        }
-
-        const { data, error } = await query.order('created_at', { ascending: false })
+          .order('created_at', { ascending: false })
 
         if (error) throw error
         
-        // لو مفيش كورسات رجعت والإدارة موجودة، نجرب نجيب كل الكورسات المنشورة كحل احتياطي (Fallback)
-        if ((!data || data.length === 0) && profile?.department_id) {
-          const { data: fallbackData } = await supabase
-            .from('courses')
-            .select('*')
-            .eq('status', 'published')
-            .order('created_at', { ascending: false })
-          
-          setCourses(fallbackData || [])
-        } else {
-          setCourses(data || [])
-        }
-
+        setCourses(data || [])
       } catch (err) {
         setError(err.message)
       } finally {
@@ -51,7 +30,6 @@ export default function Courses() {
       }
     }
 
-    // تم إزالة الشرط الصارم لضمان عمل الكويري حتى لو تأخر تحميل الـ profile قليلاً
     fetchCourses()
   }, [profile])
 
@@ -67,7 +45,7 @@ export default function Courses() {
 
       {courses.length === 0 ? (
         <div className="p-8 rounded-3xl bg-[#14181d]/80 border border-white/10 backdrop-blur-xl text-center">
-          <p className="text-gray-400">No courses available for your department at the moment.</p>
+          <p className="text-gray-400">No courses available at the moment.</p>
         </div>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
