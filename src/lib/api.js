@@ -154,6 +154,7 @@ export async function getPublishedCourses(employeeId) {
 
 export async function getCourseWithStructure(courseId) {
   try {
+    // 1. جلب بيانات الكورس الأساسية
     const { data: course, error: courseError } = await supabase
       .from('courses')
       .select('*')
@@ -162,21 +163,23 @@ export async function getCourseWithStructure(courseId) {
 
     if (courseError) throw courseError
 
-    // جلب المديولات المرتبطة بالكورس
+    // 2. جلب المديولات المرتبطة بالكورس مرتبة حسب sort_order
     const { data: modules, error: modError } = await supabase
       .from('modules')
       .select('*')
       .eq('course_id', courseId)
+      .order('sort_order', { ascending: true })
 
     if (modError) throw modError
 
-    // جلب الدروس لكل مديول بشكل مباشر لضمان ظهورها بدون عوائق
+    // 3. جلب الدروس لكل مديول والتأكد من مطابقة الـ module_id وترتيبها
     const modulesWithDetails = await Promise.all(
       (modules || []).map(async (mod) => {
         const { data: lessons, error: lessonError } = await supabase
           .from('lessons')
           .select('*')
           .eq('module_id', mod.id)
+          .order('sort_order', { ascending: true })
 
         if (lessonError) {
           console.error('Error fetching lessons for module:', mod.id, lessonError)
@@ -189,6 +192,7 @@ export async function getCourseWithStructure(courseId) {
       })
     )
 
+    // 4. جلب اختبارات الكورس
     const { data: quizzes } = await supabase
       .from('quizzes')
       .select('*')
