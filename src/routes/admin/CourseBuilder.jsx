@@ -9,7 +9,6 @@ export default function CreateCourse() {
   const [busy, setBusy] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
 
-  // بيانات الكورس الأساسية
   const [courseData, setCourseData] = useState({
     name: '',
     course_code: '',
@@ -18,14 +17,13 @@ export default function CreateCourse() {
     required: false
   })
 
-  // هيكل الوحدات والدروس والاختبارات داخل الكورس (يدعم الأنواع: video, pdf, text)
   const [modules, setModules] = useState([
     {
       title: 'Module 1',
       lessons: [
         { 
           title: '', 
-          content_type: 'video', // video, pdf, text
+          content_type: 'video', 
           video_url: '', 
           pdf_url: '', 
           text_content: '', 
@@ -41,17 +39,14 @@ export default function CreateCourse() {
     }
   ])
 
-  // جلب الأقسام وتوليد كود الكورس أوتوماتيكياً عند تحميل الشاشة
   useEffect(() => {
     async function initData() {
       try {
-        // 1. جلب الأقسام
         const { data: deptData, error: deptError } = await supabase.from('departments').select('id, name')
         if (!deptError && deptData) {
           setDepartments(deptData)
         }
 
-        // 2. توليد كود الكورس أوتوماتيكياً (CRS-000X)
         const { count, error: countError } = await supabase
           .from('courses')
           .select('*', { count: 'exact', head: true })
@@ -74,7 +69,6 @@ export default function CreateCourse() {
     )
   }
 
-  // دوال التحكم في الوحدات والدروس والاختبارات
   const addModule = () => {
     setModules(prev => [
       ...prev,
@@ -106,7 +100,6 @@ export default function CreateCourse() {
     })
   }
 
-  // رفع ملف PDF إلى Supabase Storage
   const handleFileUpload = async (e, mIdx, lIdx) => {
     const file = e.target.files[0]
     if (!file) return
@@ -154,7 +147,6 @@ export default function CreateCourse() {
     })
   }
 
-  // حفظ الكورس بالكامل
   const handleCreate = async (e) => {
     e.preventDefault()
     if (!courseData.name.trim()) {
@@ -180,7 +172,8 @@ export default function CreateCourse() {
           passing_score: Number(courseData.passing_score),
           certificate_eligible: courseData.certificate_eligible,
           required: courseData.required,
-          duration: totalCourseDurationMins
+          duration: totalCourseDurationMins,
+          status: 'published'
         }])
         .select()
         .single()
@@ -192,8 +185,7 @@ export default function CreateCourse() {
           course_id: newCourse.id,
           department_id: deptId
         }))
-        const { error: relationError } = await supabase.from('course_departments').insert(relations)
-        if (relationError) throw relationError
+        await supabase.from('course_departments').insert(relations)
       }
 
       for (let i = 0; i < modules.length; i++) {
@@ -209,20 +201,17 @@ export default function CreateCourse() {
           .select()
           .single()
 
-        if (modErr) {
-          console.warn('Modules table error or skipped:', modErr.message)
-          continue
-        }
+        if (modErr) continue
 
         if (newModule && mod.lessons.length > 0) {
           const lessonsToInsert = mod.lessons.map((l, lIdx) => ({
             module_id: newModule.id,
-            course_id: newCourse.id,
             title: l.title || `Lesson ${lIdx + 1}`,
             content_type: l.content_type,
             video_url: l.content_type === 'video' ? l.video_url : '',
             pdf_url: l.content_type === 'pdf' ? l.pdf_url : '',
             text_content: l.content_type === 'text' ? l.text_content : '',
+            body: l.content_type === 'text' ? l.text_content : (l.content_type === 'video' ? l.video_url : l.pdf_url),
             duration: Number(l.duration || 15),
             order_index: lIdx + 1
           }))
@@ -233,9 +222,9 @@ export default function CreateCourse() {
           const { data: newQuiz, error: quizErr } = await supabase
             .from('quizzes')
             .insert([{
-              module_id: newModule.id,
               course_id: newCourse.id,
-              title: mod.quiz.title
+              title: mod.quiz.title,
+              passing_score: Number(courseData.passing_score)
             }])
             .select()
             .single()
@@ -249,12 +238,12 @@ export default function CreateCourse() {
               points: Number(q.points || 10),
               order_index: qIdx + 1
             }))
-            await supabase.from('questions').insert(questionsToInsert)
+            await supabase.from('quiz_questions').insert(questionsToInsert)
           }
         }
       }
 
-      alert('Course, modules, lessons, and quizzes created successfully!')
+      alert('Course created successfully!')
       navigate('/admin/courses')
     } catch (err) {
       alert('Failed to create course: ' + err.message)
@@ -268,7 +257,6 @@ export default function CreateCourse() {
       <h1 className="text-3xl font-bold">Create New Course & Curriculum</h1>
       
       <form onSubmit={handleCreate} className="space-y-8">
-        {/* معلومات الكورس الأساسية */}
         <div className="p-6 rounded-2xl bg-[#14181d]/85 border border-white/10 space-y-4">
           <h2 className="text-xl font-semibold text-rose-500">1. Basic Information</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -283,7 +271,7 @@ export default function CreateCourse() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Course Code (Auto Generated)</label>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Course Code</label>
               <input 
                 type="text" 
                 className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-gray-400 focus:outline-none cursor-not-allowed"
@@ -301,30 +289,8 @@ export default function CreateCourse() {
               />
             </div>
           </div>
-
-          <div className="flex items-center gap-6 pt-2">
-            <label className="flex items-center gap-2 cursor-pointer text-sm">
-              <input 
-                type="checkbox" 
-                checked={courseData.certificate_eligible}
-                onChange={(e) => setCourseData({ ...courseData, certificate_eligible: e.target.checked })}
-                className="rounded border-white/20 bg-black text-rose-600 focus:ring-0 w-4 h-4"
-              />
-              Certificate eligible
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer text-sm">
-              <input 
-                type="checkbox" 
-                checked={courseData.required}
-                onChange={(e) => setCourseData({ ...courseData, required: e.target.checked })}
-                className="rounded border-white/20 bg-black text-rose-600 focus:ring-0 w-4 h-4"
-              />
-              Required
-            </label>
-          </div>
         </div>
 
-        {/* الأقسام المستهدفة */}
         <div className="p-6 rounded-2xl bg-[#14181d]/85 border border-white/10 space-y-3">
           <h2 className="text-xl font-semibold text-rose-500">2. Target Departments</h2>
           <div className="space-y-2 max-h-40 overflow-y-auto">
@@ -346,7 +312,6 @@ export default function CreateCourse() {
           </div>
         </div>
 
-        {/* الموديلات والدروس والاختبارات */}
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-rose-500">3. Course Modules, Lessons & Quizzes</h2>
@@ -384,7 +349,6 @@ export default function CreateCourse() {
                 )}
               </div>
 
-              {/* الدروس وتنوع المحتوى */}
               <div className="space-y-4 pl-4 border-l-2 border-rose-500/30">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Lessons & Content</h3>
@@ -454,7 +418,6 @@ export default function CreateCourse() {
                       </div>
                     </div>
 
-                    {/* حقول محتوى الدرس حسب النوع المختار */}
                     {lesson.content_type === 'video' && (
                       <input
                         type="text"
@@ -478,7 +441,7 @@ export default function CreateCourse() {
                           className="text-xs text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-rose-600 file:text-white hover:file:bg-rose-700"
                         />
                         {uploadingFile && <span className="text-xs text-amber-400">Uploading file...</span>}
-                        {lesson.pdf_url && <span className="text-xs text-green-400 truncate max-w-xs">PDF Ready: {lesson.pdf_url}</span>}
+                        {lesson.pdf_url && <span className="text-xs text-green-400 truncate max-w-xs">PDF Ready</span>}
                       </div>
                     )}
 
@@ -499,7 +462,6 @@ export default function CreateCourse() {
                 ))}
               </div>
 
-              {/* اختبار الموديل (Quiz) */}
               <div className="space-y-4 pl-4 border-l-2 border-teal-500/30 pt-2">
                 <h3 className="text-sm font-semibold text-teal-400 uppercase tracking-wider">Module Assessment (Quiz)</h3>
                 <input
@@ -585,12 +547,11 @@ export default function CreateCourse() {
           ))}
         </div>
 
-        {/* أزرار الحفظ */}
         <div className="flex gap-4 pt-6 border-t border-white/10">
           <button
             type="submit"
             disabled={busy}
-            className="px-8 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold transition-all shadow-lg shadow-red-950/50"
+            className="px-8 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold transition-all shadow-lg"
           >
             {busy ? 'Creating Course & Curriculum...' : 'Save & Publish Course'}
           </button>
