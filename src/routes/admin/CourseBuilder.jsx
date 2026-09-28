@@ -41,19 +41,31 @@ export default function CreateCourse() {
     }
   ])
 
-  // جلب الأقسام من جدول departments
+  // جلب الأقسام وتوليد كود الكورس أوتوماتيكياً عند تحميل الشاشة
   useEffect(() => {
-    async function fetchDepartments() {
+    async function initData() {
       try {
-        const { data, error } = await supabase.from('departments').select('id, name')
-        if (!error && data) {
-          setDepartments(data)
+        // 1. جلب الأقسام
+        const { data: deptData, error: deptError } = await supabase.from('departments').select('id, name')
+        if (!deptError && deptData) {
+          setDepartments(deptData)
+        }
+
+        // 2. توليد كود الكورس أوتوماتيكياً (CRS-000X)
+        const { count, error: countError } = await supabase
+          .from('courses')
+          .select('*', { count: 'exact', head: true })
+        
+        if (!countError) {
+          const nextNum = (count || 0) + 1
+          const autoCode = `CRS-${String(nextNum).padStart(4, '0')}`
+          setCourseData(prev => ({ ...prev, course_code: autoCode }))
         }
       } catch (err) {
-        console.error('Error fetching departments:', err)
+        console.error('Error initializing course data:', err)
       }
     }
-    fetchDepartments()
+    initData()
   }, [])
 
   const handleCheckboxChange = (deptId) => {
@@ -105,7 +117,6 @@ export default function CreateCourse() {
       const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`
       const filePath = `course_files/${fileName}`
 
-      // تأكد أن الـ bucket اسمه course-files أو قم بتعديله حسب الموجود عندك
       const { error: uploadError } = await supabase.storage
         .from('course-files') 
         .upload(filePath, file)
@@ -272,13 +283,12 @@ export default function CreateCourse() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Course Code</label>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Course Code (Auto Generated)</label>
               <input 
                 type="text" 
-                className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none"
-                placeholder="e.g. JS-202"
+                className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-gray-400 focus:outline-none cursor-not-allowed"
                 value={courseData.course_code}
-                onChange={(e) => setCourseData({ ...courseData, course_code: e.target.value })}
+                readOnly
               />
             </div>
             <div>
