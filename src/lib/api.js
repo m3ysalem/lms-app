@@ -157,36 +157,40 @@ export async function getPublishedCourses(employeeId) {
     return [];
   }
 }
-
 export async function getCourseWithStructure(courseId) {
-  // 1. جلب بيانات الكورس الأساسية
-  const { data: course, error: courseError } = await supabase
-    .from('courses')
-    .select('*')
-    .eq('id', courseId)
-    .single()
+  try {
+    // 1. جلب بيانات الكورس الأساسية
+    const { data: course, error: courseError } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('id', courseId)
+      .single()
 
-  if (courseError) throw courseError
+    if (courseError) throw courseError
 
-  // 2. جلب المديولات والدروس المرتبطة بالكورس
-  const { data: modules, error: modError } = await supabase
-    .from('modules')
-    .select(`
-      *,
-      lessons (*),
-      quizzes (
+    // 2. جلب المديولات والدروس والاختبارات المرتبطة بالكورس
+    const { data: modules, error: modError } = await supabase
+      .from('modules')
+      .select(`
         *,
-        questions (*)
-      )
-    `)
-    .eq('course_id', courseId)
-    .order('order_index', { ascending: true })
+        lessons (*),
+        quizzes (
+          *,
+          questions (*)
+        )
+      `)
+      .eq('course_id', courseId)
+      .order('order_index', { ascending: true })
 
-  if (modError) throw modError
+    if (modError) throw modError
 
-  return {
-    course,
-    modules: modules || []
+    return {
+      course,
+      modules: modules || []
+    }
+  } catch (err) {
+    console.error('getCourseWithStructure error:', err)
+    throw err
   }
 }
     const formattedModules = (modules || []).map((m) => ({
