@@ -164,10 +164,12 @@ export default function CreateCourse() {
         })
       })
 
+      // 1. إنشاء الكورس الأساسي مع الحقول المطلوبة للتقارير
       const { data: newCourse, error: courseError } = await supabase
         .from('courses')
         .insert([{
           name: courseData.name,
+          title: courseData.name,
           course_code: courseData.course_code,
           passing_score: Number(courseData.passing_score),
           certificate_eligible: courseData.certificate_eligible,
@@ -188,10 +190,10 @@ export default function CreateCourse() {
         await supabase.from('course_departments').insert(relations)
       }
 
+      // 2. تكرار وإدخال المديولات، الدروس، والاختبارات مع ضبط الترتيب وارتباطات الـ IDs
       for (let i = 0; i < modules.length; i++) {
         const mod = modules[i]
         
-        // تم استبدال order_index بـ sort_order لتجنب الخطأ
         const { data: newModule, error: modErr } = await supabase
           .from('modules')
           .insert([{
@@ -202,7 +204,10 @@ export default function CreateCourse() {
           .select()
           .single()
 
-        if (modErr) continue
+        if (modErr) {
+          console.error('Module insert error:', modErr)
+          continue
+        }
 
         if (newModule && mod.lessons.length > 0) {
           const lessonsToInsert = mod.lessons.map((l, lIdx) => ({
@@ -216,7 +221,8 @@ export default function CreateCourse() {
             duration: Number(l.duration || 15),
             sort_order: lIdx + 1
           }))
-          await supabase.from('lessons').insert(lessonsToInsert)
+          const { error: lessonErr } = await supabase.from('lessons').insert(lessonsToInsert)
+          if (lessonErr) console.error('Lesson insert error:', lessonErr)
         }
 
         if (newModule && mod.quiz && mod.quiz.questions.length > 0 && mod.quiz.title) {
@@ -224,6 +230,7 @@ export default function CreateCourse() {
             .from('quizzes')
             .insert([{
               course_id: newCourse.id,
+              module_id: newModule.id,
               title: mod.quiz.title,
               passing_score: Number(courseData.passing_score)
             }])
@@ -237,14 +244,15 @@ export default function CreateCourse() {
               options: q.options,
               correct_answer: q.correct_answer,
               points: Number(q.points || 10),
-              order_index: qIdx + 1
+              sort_order: qIdx + 1 // تم توحيد الترتيب بـ sort_order لضمان التوافق مع التقارير وقاعدة البيانات
             }))
-            await supabase.from('quiz_questions').insert(questionsToInsert)
+            const { error: qErr } = await supabase.from('quiz_questions').insert(questionsToInsert)
+            if (qErr) console.error('Quiz questions insert error:', qErr)
           }
         }
       }
 
-      alert('Course created successfully!')
+      alert('Course and curriculum created successfully!')
       navigate('/admin/courses')
     } catch (err) {
       alert('Failed to create course: ' + err.message)
