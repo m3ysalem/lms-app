@@ -172,7 +172,7 @@ export async function getCourseWithStructure(courseId) {
 
     if (modError) throw modError
 
-    // 3. جلب الدروس والاختبارات لكل مديول بناءً على الـ id الخاص بالمديول
+    // 3. جلب الدروس والاختبارات لكل مديول بناءً على الـ id الصحيح للمديول
     const modulesWithDetails = await Promise.all(
       (modules || []).map(async (mod) => {
         // جلب الدروس باستخدام module_id المطابق لـ mod.id
@@ -186,14 +186,11 @@ export async function getCourseWithStructure(courseId) {
           console.error('Error fetching lessons for module:', mod.id, lessonError)
         }
 
-        // جلب الاختبارات والأسئلة التابعة لها
+        // جلب الاختبارات التابعة للكورس أو المرتبطة بالمديول حسب النظام
         const { data: quizzes } = await supabase
           .from('quizzes')
-          .select(`
-            *,
-            questions:quiz_questions (*)
-          `)
-          .eq('module_id', mod.id)
+          .select('*')
+          .eq('course_id', courseId)
 
         return {
           ...mod,
@@ -311,31 +308,38 @@ export async function getQuizQuestions(quizId) {
       .from('quiz_questions')
       .select('*')
       .eq('quiz_id', quizId)
+      .order('order_index', { ascending: true })
 
     if (qError || !qData) return []
 
-    const questionIds = qData.map(q => q.id)
-    const { data: aData } = await supabase
-      .from('quiz_answers')
-      .select('*')
-      .in('question_id', questionIds)
+    // التعامل مع خيارات الـ jsonb والـ correct_answer الموجودة في الجدول مباشرة
+    return qData.map(q => {
+      let parsedOptions = []
+      try {
+        if (typeof q.options === 'string') {
+          parsedOptions = JSON.parse(q.options)
+        } else if (Array.isArray(q.options)) {
+          parsedOptions = q.options
+        } else if (q.options && typeof q.options === 'object') {
+          parsedOptions = Object.values(q.options)
+        }
+      } catch (e) {
+        parsedOptions = []
+      }
 
-    const answersList = aData || []
-
-    return qData.map(q => ({
-      id: q.id,
-      text: q.text || q.question_text,
-      type: q.type || q.question_type || 'multiple_choice',
-      points: q.points || 1,
-      correct_answer_text: q.correct_answer_text || '',
-      answers: answersList
-        .filter(a => a.question_id === q.id)
-        .map(a => ({ 
-          id: a.id, 
-          text: a.answer_text || a.text,
-          is_correct: a.is_correct 
+      return {
+        id: q.id,
+        text: q.question_text || q.text,
+        type: q.type || 'multiple_choice',
+        points: q.points || 1,
+        correct_answer: q.correct_answer,
+        answers: parsedOptions.map((opt, idx) => ({
+          id: idx,
+          text: typeof opt === 'string' ? opt : (opt.text || opt.answer_text || String(opt)),
+          is_correct: idx === q.correct_answer
         }))
-    }))
+      }
+    })
   } catch (err) {
     console.error('getQuizQuestions error:', err)
     return []
