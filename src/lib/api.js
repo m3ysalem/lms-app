@@ -159,33 +159,36 @@ export async function getPublishedCourses(employeeId) {
 }
 
 export async function getCourseWithStructure(courseId) {
-  try {
-    const { data: course, error: courseErr } = await supabase
-      .from('courses')
-      .select('*')
-      .eq('id', courseId)
-      .maybeSingle()
+  // 1. جلب بيانات الكورس الأساسية
+  const { data: course, error: courseError } = await supabase
+    .from('courses')
+    .select('*')
+    .eq('id', courseId)
+    .single()
 
-    if (courseErr || !course) throw courseErr || new Error('Course not found')
+  if (courseError) throw courseError
 
-    const { data: modules, error: modErr } = await supabase
-      .from('modules')
-      .select('*')
-      .eq('course_id', courseId)
-      .order('sort_order', { ascending: true })
+  // 2. جلب المديولات والدروس المرتبطة بالكورس
+  const { data: modules, error: modError } = await supabase
+    .from('modules')
+    .select(`
+      *,
+      lessons (*),
+      quizzes (
+        *,
+        questions (*)
+      )
+    `)
+    .eq('course_id', courseId)
+    .order('order_index', { ascending: true })
 
-    if (modErr) console.error('Modules fetch error:', modErr)
+  if (modError) throw modError
 
-    const moduleIds = (modules || []).map(m => m.id)
-    let allLessons = []
-    if (moduleIds.length > 0) {
-      const { data: lessonsData } = await supabase
-        .from('lessons')
-        .select('*')
-        .in('module_id', moduleIds)
-      allLessons = lessonsData || []
-    }
-
+  return {
+    course,
+    modules: modules || []
+  }
+}
     const formattedModules = (modules || []).map((m) => ({
       ...m,
       lessons: allLessons.filter(l => l.module_id === m.id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
