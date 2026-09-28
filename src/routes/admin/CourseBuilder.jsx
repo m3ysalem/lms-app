@@ -1,4 +1,4 @@
-\import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 
@@ -164,7 +164,6 @@ export default function CreateCourse() {
         })
       })
 
-      // 1. إنشاء الكورس الأساسي (تمت إزالة عمود title الذي كان يسبب المشكلة)
       const { data: newCourse, error: courseError } = await supabase
         .from('courses')
         .insert([{
@@ -189,7 +188,6 @@ export default function CreateCourse() {
         await supabase.from('course_departments').insert(relations)
       }
 
-      // 2. إدخال المديولات، الدروس، والاختبارات
       for (let i = 0; i < modules.length; i++) {
         const mod = modules[i]
         
@@ -251,7 +249,7 @@ export default function CreateCourse() {
         }
       }
 
-      alert('Course and curriculum created successfully!')
+      alert('Course created successfully!')
       navigate('/admin/courses')
     } catch (err) {
       alert('Failed to create course: ' + err.message)
