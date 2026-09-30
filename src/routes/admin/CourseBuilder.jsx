@@ -4,52 +4,81 @@ import { supabase } from '../../lib/supabaseClient'
 
 export default function CreateCourse() {
   const navigate = useNavigate()
-  const [viewMode, setViewMode] = useState('list') // 'list' أو 'form'
+  
+  // حفظ واسترجاع وضع العرض من الـ localStorage لكي لا يعود للوضع القديم عند التنقل
+  const [viewMode, setViewMode] = useState(() => {
+    return localStorage.getItem('course_view_mode') || 'list'
+  })
+  
   const [courses, setCourses] = useState([])
   const [departments, setDepartments] = useState([])
   const [selectedDepts, setSelectedDepts] = useState([])
   const [busy, setBusy] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
-  const [editingCourseId, setEditingCourseId] = useState(null)
+  const [editingCourseId, setEditingCourseId] = useState(() => {
+    return localStorage.getItem('course_editing_id') || null
+  })
   const [activeMenu, setActiveMenu] = useState(null)
 
   const menuRef = useRef(null)
 
-  const [courseData, setCourseData] = useState({
-    name: '',
-    course_code: '',
-    passing_score: 70,
-    certificate_eligible: true,
-    required: false,
-    status: 'published'
+  const [courseData, setCourseData] = useState(() => {
+    const saved = localStorage.getItem('course_form_data')
+    return saved ? JSON.parse(saved) : {
+      name: '',
+      course_code: '',
+      passing_score: 70,
+      certificate_eligible: true,
+      required: false,
+      status: 'published'
+    }
   })
 
-  const [modules, setModules] = useState([
-    {
-      title: 'Module 1',
-      lessons: [
-        { 
-          title: '', 
-          content_type: 'video', 
-          video_url: '', 
-          pdf_url: '', 
-          text_content: '', 
-          duration: 15 
+  const [modules, setModules] = useState(() => {
+    const saved = localStorage.getItem('course_modules_data')
+    return saved ? JSON.parse(saved) : [
+      {
+        title: 'Module 1',
+        lessons: [
+          { 
+            title: '', 
+            content_type: 'video', 
+            video_url: '', 
+            pdf_url: '', 
+            text_content: '', 
+            duration: 15 
+          }
+        ],
+        quiz: {
+          title: '',
+          questions: [
+            { question_text: '', options: ['', '', '', ''], correct_answer: 0, points: 10 }
+          ]
         }
-      ],
-      quiz: {
-        title: '',
-        questions: [
-          { question_text: '', options: ['', '', '', ''], correct_answer: 0, points: 10 }
-        ]
       }
-    }
-  ])
+    ]
+  })
+
+  // حفظ الحالة في الـ localStorage لضمان عدم ضياعها عند التنقل بين الصفحات
+  useEffect(() => {
+    localStorage.setItem('course_view_mode', viewMode)
+  }, [viewMode])
+
+  useEffect(() => {
+    localStorage.setItem('course_editing_id', editingCourseId || '')
+  }, [editingCourseId])
+
+  useEffect(() => {
+    localStorage.setItem('course_form_data', JSON.stringify(courseData))
+  }, [courseData])
+
+  useEffect(() => {
+    localStorage.setItem('course_modules_data', JSON.stringify(modules))
+  }, [modules])
 
   useEffect(() => {
     fetchInitialData()
     
-    // إغلاق القائمة المنسدلة عند الضغط في أي مكان خارجها
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setActiveMenu(null)
@@ -96,7 +125,6 @@ export default function CreateCourse() {
       }
     ])
 
-    // توليد كود تلقائي
     const { count } = await supabase.from('courses').select('*', { count: 'exact', head: true })
     const nextNum = (count || 0) + 1
     setCourseData(prev => ({ ...prev, course_code: `CRS-${String(nextNum).padStart(4, '0')}` }))
@@ -118,7 +146,6 @@ export default function CreateCourse() {
     setSelectedDepts(deptIds)
 
     try {
-      // جلب المديولات والدروس والاختبارات الخاصة بالكورس للتعديل
       const { data: modData } = await supabase
         .from('modules')
         .select('*, lessons(*), quizzes(*, quiz_questions(*))')
@@ -151,12 +178,6 @@ export default function CreateCourse() {
           } : { title: '', questions: [{ question_text: '', options: ['', '', '', ''], correct_answer: 0, points: 10 }] }
         }))
         setModules(formattedModules)
-      } else {
-        setModules([{
-          title: 'Module 1',
-          lessons: [{ title: '', content_type: 'video', video_url: '', pdf_url: '', text_content: '', duration: 15 }],
-          quiz: { title: '', questions: [{ question_text: '', options: ['', '', '', ''], correct_answer: 0, points: 10 }] }
-        }])
       }
     } catch (err) {
       console.error('Error loading course details for edit:', err)
@@ -167,14 +188,14 @@ export default function CreateCourse() {
   }
 
   const handleDeleteCourse = async (courseId) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا الكورس نهائياً؟')) return
+    if (!window.confirm('Are you sure you want to delete this course permanently?')) return
     try {
       const { error } = await supabase.from('courses').delete().eq('id', courseId)
       if (error) throw error
       setCourses(prev => prev.filter(c => c.id !== courseId))
-      alert('تم حذف الكورس بنجاح')
+      alert('Course deleted successfully')
     } catch (err) {
-      alert('فشل الحذف: ' + err.message)
+      alert('Delete failed: ' + err.message)
     }
     setActiveMenu(null)
   }
@@ -186,7 +207,7 @@ export default function CreateCourse() {
       if (error) throw error
       setCourses(prev => prev.map(c => c.id === course.id ? { ...c, status: newStatus } : c))
     } catch (err) {
-      alert('فشل تغيير الحالة: ' + err.message)
+      alert('Status update failed: ' + err.message)
     }
     setActiveMenu(null)
   }
@@ -251,9 +272,9 @@ export default function CreateCourse() {
       const updated = [...modules]
       updated[mIdx].lessons[lIdx].pdf_url = publicUrl
       setModules(updated)
-      alert('تم رفع الملف بنجاح!')
+      alert('File uploaded successfully!')
     } catch (err) {
-      alert('فشل رفع الملف: ' + err.message)
+      alert('Upload failed: ' + err.message)
     } finally {
       setUploadingFile(false)
     }
@@ -278,7 +299,7 @@ export default function CreateCourse() {
   const handleSaveCourse = async (e) => {
     e.preventDefault()
     if (!courseData.name.trim()) {
-      alert('الرجاء إدخال اسم الكورس')
+      alert('Please enter the course name')
       return
     }
 
@@ -293,11 +314,9 @@ export default function CreateCourse() {
       })
 
       const primaryDeptId = selectedDepts.length > 0 ? selectedDepts[0] : null
-
       let courseId = editingCourseId
 
       if (editingCourseId) {
-        // تحديث الكورس الحالي
         const { error: updateErr } = await supabase
           .from('courses')
           .update({
@@ -314,18 +333,15 @@ export default function CreateCourse() {
 
         if (updateErr) throw updateErr
 
-        // تحديث الأقسام المرتبطة
         await supabase.from('course_departments').delete().eq('course_id', editingCourseId)
         if (selectedDepts.length > 0) {
           const relations = selectedDepts.map(deptId => ({ course_id: editingCourseId, department_id: deptId }))
           await supabase.from('course_departments').insert(relations)
         }
 
-        // حذف المديولات القديمة وإعادة إضافتها لضمان المزامنة السليمة
         await supabase.from('modules').delete().eq('course_id', editingCourseId)
 
       } else {
-        // إنشاء كورس جديد
         const { data: newCourse, error: courseError } = await supabase
           .from('courses')
           .insert([{
@@ -350,7 +366,6 @@ export default function CreateCourse() {
         }
       }
 
-      // إضافة المديولات والدروس والاختبارات
       for (let i = 0; i < modules.length; i++) {
         const mod = modules[i]
         const { data: newModule, error: modErr } = await supabase
@@ -397,49 +412,49 @@ export default function CreateCourse() {
         }
       }
 
-      alert('تم حفظ الكورس ونشره بنجاح!')
+      alert('Course saved and published successfully!')
       setViewMode('list')
       fetchInitialData()
     } catch (err) {
-      alert('فشل حفظ الكورس: ' + err.message)
+      alert('Save failed: ' + err.message)
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <div className="space-y-6 max-w-6xl text-white p-6 pb-24 mx-auto">
+    <div className="space-y-6 max-w-6xl text-white p-6 pb-24 mx-auto text-left" dir="ltr">
       {viewMode === 'list' ? (
         <>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold">إدارة الكورسات</h1>
-              <p className="text-gray-400 text-sm mt-1">عرض وتعديل ونشر الكورسات الخاصة بالموظفين والأقسام</p>
+              <h1 className="text-3xl font-bold">Course Management</h1>
+              <p className="text-gray-400 text-sm mt-1">View, edit, and publish employee training courses</p>
             </div>
             <button
               onClick={handleOpenCreate}
               className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-medium transition-all shadow-lg flex items-center gap-2"
             >
-              <span>+ إضافة كورس جديد</span>
+              <span>+ Add New Course</span>
             </button>
           </div>
 
           <div className="bg-[#14181d]/90 border border-white/10 rounded-2xl overflow-hidden shadow-xl mt-6">
             <div className="overflow-x-auto">
-              <table className="w-full text-right border-collapse">
+              <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-white/10 bg-black/40 text-gray-400 text-xs uppercase tracking-wider">
-                    <th className="p-4">كود الكورس</th>
-                    <th className="p-4">اسم الكورس</th>
-                    <th className="p-4">درجة النجاح</th>
-                    <th className="p-4">الحالة</th>
-                    <th className="p-4 text-center">الإجراءات</th>
+                    <th className="p-4">Course Code</th>
+                    <th className="p-4">Course Name</th>
+                    <th className="p-4">Passing Score</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 text-sm">
                   {courses.length === 0 ? (
                     <tr>
-                      <td colSpan="5" className="p-8 text-center text-gray-400">لا توجد كورسات مضافة حتى الآن.</td>
+                      <td colSpan="5" className="p-8 text-center text-gray-400">No courses added yet.</td>
                     </tr>
                   ) : (
                     courses.map((course) => (
@@ -449,7 +464,7 @@ export default function CreateCourse() {
                         <td className="p-4 text-gray-300">{course.passing_score}%</td>
                         <td className="p-4">
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${course.status === 'published' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}`}>
-                            {course.status === 'published' ? 'منشور' : 'مسودة (Draft)'}
+                            {course.status === 'published' ? 'Published' : 'Draft'}
                           </span>
                         </td>
                         <td className="p-4 text-center relative">
@@ -461,27 +476,27 @@ export default function CreateCourse() {
                           </button>
 
                           {activeMenu === course.id && (
-                            <div ref={menuRef} className="absolute left-1/2 -translate-x-1/2 mt-2 w-48 bg-[#1e232a] border border-white/10 rounded-xl shadow-2xl z-50 py-2 text-right">
+                            <div ref={menuRef} className="absolute right-1/2 translate-x-1/2 mt-2 w-48 bg-[#1e232a] border border-white/10 rounded-xl shadow-2xl z-50 py-2 text-left">
                               <button
                                 onClick={() => handleOpenEdit(course)}
-                                className="w-full px-4 py-2 text-sm text-gray-200 hover:bg-rose-600 hover:text-white transition-colors text-right flex items-center justify-between"
+                                className="w-full px-4 py-2 text-sm text-gray-200 hover:bg-rose-600 hover:text-white transition-colors text-left flex items-center justify-between"
                               >
-                                <span>تعديل التفاصيل</span>
+                                <span>Edit Details</span>
                                 <span>✏️</span>
                               </button>
                               <button
                                 onClick={() => handleToggleStatus(course)}
-                                className="w-full px-4 py-2 text-sm text-gray-200 hover:bg-white/10 transition-colors text-right flex items-center justify-between"
+                                className="w-full px-4 py-2 text-sm text-gray-200 hover:bg-white/10 transition-colors text-left flex items-center justify-between"
                               >
-                                <span>{course.status === 'published' ? 'تحويل إلى درافت' : 'نشر الكورس'}</span>
+                                <span>{course.status === 'published' ? 'Make Draft' : 'Publish'}</span>
                                 <span>{course.status === 'published' ? '🔒' : '🌐'}</span>
                               </button>
                               <div className="border-t border-white/10 my-1"></div>
                               <button
                                 onClick={() => handleDeleteCourse(course.id)}
-                                className="w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 transition-colors text-right flex items-center justify-between"
+                                className="w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 transition-colors text-left flex items-center justify-between"
                               >
-                                <span>حذف الكورس</span>
+                                <span>Delete Course</span>
                                 <span>🗑️</span>
                               </button>
                             </div>
@@ -499,33 +514,33 @@ export default function CreateCourse() {
         <form onSubmit={handleSaveCourse} className="space-y-8">
           <div className="flex items-center justify-between border-b border-white/10 pb-4">
             <div>
-              <h1 className="text-3xl font-bold">{editingCourseId ? 'تعديل الكورس' : 'إنشاء كورس جديد'}</h1>
-              <p className="text-gray-400 text-sm mt-1">قم بتعديل كافة تفاصيل المديولات، الدروس، والاختبارات</p>
+              <h1 className="text-3xl font-bold">{editingCourseId ? 'Edit Course' : 'Create New Course'}</h1>
+              <p className="text-gray-400 text-sm mt-1">Configure modules, lessons, and assessments</p>
             </div>
             <button
               type="button"
               onClick={() => setViewMode('list')}
-              className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-sm transition-colors"
+              className="px-4 py-2 bg-white/10 hover:bg-white/25 rounded-xl text-sm transition-colors"
             >
-              ← العودة للقائمة
+              ← Back to List
             </button>
           </div>
 
           <div className="p-6 rounded-2xl bg-[#14181d]/85 border border-white/10 space-y-4">
-            <h2 className="text-xl font-semibold text-rose-500">1. المعلومات الأساسية</h2>
+            <h2 className="text-xl font-semibold text-rose-500">1. Basic Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">اسم الكورس</label>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Course Name</label>
                 <input 
                   type="text" 
                   className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none"
-                  placeholder="مثال: مهارات القيادة الحديثة"
+                  placeholder="e.g. Modern Leadership Skills"
                   value={courseData.name}
                   onChange={(e) => setCourseData({ ...courseData, name: e.target.value })}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">كود الكورس</label>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Course Code</label>
                 <input 
                   type="text" 
                   className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-gray-400 focus:outline-none cursor-not-allowed"
@@ -534,7 +549,7 @@ export default function CreateCourse() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">درجة النجاح (%)</label>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Passing Score (%)</label>
                 <input 
                   type="number" 
                   className="w-full p-2.5 border rounded-lg bg-black/40 border-white/10 text-white focus:border-rose-500 focus:outline-none"
@@ -546,10 +561,10 @@ export default function CreateCourse() {
           </div>
 
           <div className="p-6 rounded-2xl bg-[#14181d]/85 border border-white/10 space-y-3">
-            <h2 className="text-xl font-semibold text-rose-500">2. الأقسام المستهدفة</h2>
+            <h2 className="text-xl font-semibold text-rose-500">2. Target Departments</h2>
             <div className="space-y-2 max-h-40 overflow-y-auto">
               {departments.length === 0 ? (
-                <p className="text-gray-400 text-sm">لا توجد أقسام مسجلة.</p>
+                <p className="text-gray-400 text-sm">No departments registered.</p>
               ) : (
                 departments.map((dept) => (
                   <label key={dept.id} className="flex items-center gap-3 cursor-pointer text-sm hover:text-white">
@@ -568,13 +583,13 @@ export default function CreateCourse() {
 
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-rose-500">3. المديولات، الدروس، والاختبارات</h2>
+              <h2 className="text-xl font-semibold text-rose-500">3. Modules, Lessons & Quizzes</h2>
               <button
                 type="button"
                 onClick={addModule}
                 className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-medium transition-colors"
               >
-                + إضافة مديول جديد
+                + Add Module
               </button>
             </div>
 
@@ -590,7 +605,7 @@ export default function CreateCourse() {
                       setModules(updated)
                     }}
                     className="bg-black/50 border border-white/20 rounded-lg p-2 font-bold text-lg text-white w-full max-w-sm"
-                    placeholder="عنوان المديول"
+                    placeholder="Module Title"
                   />
                   {modules.length > 1 && (
                     <button
@@ -598,20 +613,20 @@ export default function CreateCourse() {
                       onClick={() => removeModule(mIdx)}
                       className="text-red-400 hover:text-red-300 text-sm font-medium"
                     >
-                      حذف المديول
+                      Delete Module
                     </button>
                   )}
                 </div>
 
-                <div className="space-y-4 pl-4 border-l-2 border-rose-500/30">
+                <div className="space-y-4 pr-4 border-r-2 border-rose-500/30">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">الدروس والمحتوى</h3>
+                    <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Lessons & Content</h3>
                     <button
                       type="button"
                       onClick={() => addLesson(mIdx)}
                       className="text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-md transition-colors"
                     >
-                      + إضافة درس
+                      + Add Lesson
                     </button>
                   </div>
 
@@ -621,7 +636,7 @@ export default function CreateCourse() {
                         <div className="md:col-span-5">
                           <input
                             type="text"
-                            placeholder="عنوان الدرس"
+                            placeholder="Lesson Title"
                             value={lesson.title}
                             onChange={(e) => {
                               const updated = [...modules]
@@ -641,15 +656,15 @@ export default function CreateCourse() {
                             }}
                             className="w-full p-2 bg-black/40 border border-white/10 rounded-lg text-sm text-white"
                           >
-                            <option value="video">فيديو خارجي (يوتيوب/رابط)</option>
-                            <option value="pdf">ملف PDF</option>
-                            <option value="text">محتوى نصي وملاحظات</option>
+                            <option value="video">External Video (YouTube/Link)</option>
+                            <option value="pdf">PDF File</option>
+                            <option value="text">Text Content & Notes</option>
                           </select>
                         </div>
                         <div className="md:col-span-2">
                           <input
                             type="number"
-                            placeholder="دقائق"
+                            placeholder="Mins"
                             value={lesson.duration}
                             onChange={(e) => {
                               const updated = [...modules]
@@ -675,7 +690,7 @@ export default function CreateCourse() {
                       {lesson.content_type === 'video' && (
                         <input
                           type="text"
-                          placeholder="ضع رابط الفيديو هنا..."
+                          placeholder="Paste video URL here..."
                           value={lesson.video_url}
                           onChange={(e) => {
                             const updated = [...modules]
@@ -694,15 +709,15 @@ export default function CreateCourse() {
                             onChange={(e) => handleFileUpload(e, mIdx, lIdx)}
                             className="text-xs text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-rose-600 file:text-white"
                           />
-                          {uploadingFile && <span className="text-xs text-amber-400">جاري الرفع...</span>}
-                          {lesson.pdf_url && <span className="text-xs text-green-400">تم رفع الملف بنجاح</span>}
+                          {uploadingFile && <span className="text-xs text-amber-400">Uploading...</span>}
+                          {lesson.pdf_url && <span className="text-xs text-green-400">File uploaded successfully</span>}
                         </div>
                       )}
 
                       {lesson.content_type === 'text' && (
                         <textarea
                           rows="3"
-                          placeholder="اكتب ملاحظات أو محتوى الدرس النصي هنا..."
+                          placeholder="Write lesson text or notes here..."
                           value={lesson.text_content}
                           onChange={(e) => {
                             const updated = [...modules]
@@ -716,11 +731,11 @@ export default function CreateCourse() {
                   ))}
                 </div>
 
-                <div className="space-y-4 pl-4 border-l-2 border-teal-500/30 pt-2">
-                  <h3 className="text-sm font-semibold text-teal-400 uppercase tracking-wider">اختبار المديول (Quiz)</h3>
+                <div className="space-y-4 pr-4 border-r-2 border-teal-500/30 pt-2">
+                  <h3 className="text-sm font-semibold text-teal-400 uppercase tracking-wider">Module Quiz</h3>
                   <input
                     type="text"
-                    placeholder="عنوان الاختبار (مثال: تقييم مديول 1)"
+                    placeholder="Quiz Title (e.g. Module 1 Assessment)"
                     value={mod.quiz.title}
                     onChange={(e) => {
                       const updated = [...modules]
@@ -734,20 +749,20 @@ export default function CreateCourse() {
                     {mod.quiz.questions.map((q, qIdx) => (
                       <div key={qIdx} className="bg-black/40 p-4 rounded-xl border border-white/10 space-y-3">
                         <div className="flex justify-between items-center">
-                          <span className="text-xs text-gray-400">السؤال {qIdx + 1}</span>
+                          <span className="text-xs text-gray-400">Question {qIdx + 1}</span>
                           {mod.quiz.questions.length > 1 && (
                             <button
                               type="button"
                               onClick={() => removeQuestion(mIdx, qIdx)}
                               className="text-red-400 hover:text-red-300 text-xs"
                             >
-                              حذف السؤال
+                              Delete Question
                             </button>
                           )}
                         </div>
                         <input
                           type="text"
-                          placeholder="نص السؤال..."
+                          placeholder="Question text..."
                           value={q.question_text}
                           onChange={(e) => {
                             const updated = [...modules]
@@ -773,7 +788,7 @@ export default function CreateCourse() {
                               />
                               <input
                                 type="text"
-                                placeholder={`الخيار ${oIdx + 1}`}
+                                placeholder={`Option ${oIdx + 1}`}
                                 value={opt}
                                 onChange={(e) => {
                                   const updated = [...modules]
@@ -793,7 +808,7 @@ export default function CreateCourse() {
                       onClick={() => addQuestion(mIdx)}
                       className="text-xs bg-teal-600/20 text-teal-300 hover:bg-teal-600/30 px-3 py-1.5 rounded-md transition-colors"
                     >
-                      + إضافة سؤال
+                      + Add Question
                     </button>
                   </div>
                 </div>
@@ -807,14 +822,14 @@ export default function CreateCourse() {
               disabled={busy}
               className="px-8 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold transition-all shadow-lg"
             >
-              {busy ? 'جاري الحفظ...' : 'حفظ ونشر التعديلات'}
+              {busy ? 'Saving...' : 'Save & Publish Changes'}
             </button>
             <button
               type="button"
               onClick={() => setViewMode('list')}
               className="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium transition-colors"
             >
-              إلغاء
+              Cancel
             </button>
           </div>
         </form>
