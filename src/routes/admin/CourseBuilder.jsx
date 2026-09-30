@@ -18,9 +18,9 @@ export default function CourseBuilder() {
     return localStorage.getItem('course_editing_id') || null
   })
   
-  // نظام إحداثيات القائمة المنسدلة لتظهر فوق الجدول تماماً بدون Scroll
+  // نظام الإحداثيات للقائمة المنسدلة لتظهر بجوار الزر مباشرة
   const [activeMenu, setActiveMenu] = useState(null)
-  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
+  const [menuPosition, setMenuPosition] + useState({ top: 0, left: 0 })
   const menuRef = useRef(null)
 
   const [courseData, setCourseData] = useState(() => {
@@ -212,6 +212,7 @@ export default function CourseBuilder() {
     setActiveMenu(null)
   }
 
+  // حساب دقيق لموقع القائمة بجوار الزر مباشرة (تم ضبط الإحداثيات يساراً)
   const handleMenuToggle = (e, courseId) => {
     e.stopPropagation()
     if (activeMenu === courseId) {
@@ -219,8 +220,8 @@ export default function CourseBuilder() {
     } else {
       const rect = e.currentTarget.getBoundingClientRect()
       setMenuPosition({
-        top: rect.bottom + window.scrollY + 4,
-        left: rect.left + window.scrollX - 140 // لضبط محاذاة القائمة لتظهر بشكل مرتب
+        top: rect.bottom + window.scrollY + 6,
+        left: rect.right + window.scrollX - 190 // محاذاة دقيقة لظهر القائمة أسفل الزر مباشرة
       })
       setActiveMenu(courseId)
     }
@@ -453,7 +454,6 @@ export default function CourseBuilder() {
             </button>
           </div>
 
-          {/* تم إزالة الـ overflow المخفي من الحاوية لضمان عدم حبس القائمة المنسدلة */}
           <div className="bg-[#14181d]/90 border border-white/10 rounded-2xl shadow-xl mt-6">
             <div className="w-full">
               <table className="w-full text-left border-collapse">
@@ -498,7 +498,7 @@ export default function CourseBuilder() {
             </div>
           </div>
 
-          {/* القائمة المنسدلة العائمة (Fixed Dropdown) لتظهر خارج الجدول تماماً وبدون أي Scroll */}
+          {/* القائمة العائمة المحدثة لتظهر بدقة بجانب زر العمليات مباشرة */}
           {activeMenu && (
             <div
               ref={menuRef}
