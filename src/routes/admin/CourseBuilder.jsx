@@ -18,9 +18,7 @@ export default function CourseBuilder() {
     return localStorage.getItem('course_editing_id') || null
   })
   
-  // تم تصحيح علامة الزائد (+) إلى علامة يساوي (=) هنا
   const [activeMenu, setActiveMenu] = useState(null)
-  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
   const menuRef = useRef(null)
 
   const [courseData, setCourseData] = useState(() => {
@@ -210,20 +208,6 @@ export default function CourseBuilder() {
       alert('Status update failed: ' + err.message)
     }
     setActiveMenu(null)
-  }
-
-  const handleMenuToggle = (e, courseId) => {
-    e.stopPropagation()
-    if (activeMenu === courseId) {
-      setActiveMenu(null)
-    } else {
-      const rect = e.currentTarget.getBoundingClientRect()
-      setMenuPosition({
-        top: rect.bottom + window.scrollY + 6,
-        left: rect.right + window.scrollX - 190
-      })
-      setActiveMenu(courseId)
-    }
   }
 
   const handleCheckboxChange = (deptId) => {
@@ -481,13 +465,44 @@ export default function CourseBuilder() {
                             {course.status === 'published' ? 'Published' : 'Draft'}
                           </span>
                         </td>
-                        <td className="p-4 text-center">
+                        <td className="p-4 text-center relative">
                           <button
-                            onClick={(e) => handleMenuToggle(e, course.id)}
+                            onClick={() => setActiveMenu(activeMenu === course.id ? null : course.id)}
                             className="p-2 hover:bg-white/10 rounded-lg text-gray-300 transition-colors"
                           >
                             ⋮
                           </button>
+
+                          {/* تم جعل القائمة تظهر داخل حدود الجدول مباشرة وبجانب زر الـ Actions بأمان */}
+                          {activeMenu === course.id && (
+                            <div
+                              ref={menuRef}
+                              className="absolute right-8 top-0 w-44 bg-[#1e232a] border border-white/15 rounded-xl shadow-2xl z-50 py-2 text-left"
+                            >
+                              <button
+                                onClick={() => handleOpenEdit(course)}
+                                className="w-full px-4 py-2 text-sm text-gray-200 hover:bg-rose-600 hover:text-white transition-colors text-left flex items-center justify-between"
+                              >
+                                <span>Edit Details</span>
+                                <span>✏️</span>
+                              </button>
+                              <button
+                                onClick={() => handleToggleStatus(course)}
+                                className="w-full px-4 py-2 text-sm text-gray-200 hover:bg-white/10 transition-colors text-left flex items-center justify-between"
+                              >
+                                <span>{course.status === 'published' ? 'Make Draft' : 'Publish'}</span>
+                                <span>{course.status === 'published' ? '🔒' : '🌐'}</span>
+                              </button>
+                              <div className="border-t border-white/10 my-1"></div>
+                              <button
+                                onClick={() => handleDeleteCourse(course.id)}
+                                className="w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 transition-colors text-left flex items-center justify-between"
+                              >
+                                <span>Delete Course</span>
+                                <span>🗑️</span>
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -496,41 +511,6 @@ export default function CourseBuilder() {
               </table>
             </div>
           </div>
-
-          {activeMenu && (
-            <div
-              ref={menuRef}
-              style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
-              className="absolute w-48 bg-[#1e232a] border border-white/10 rounded-xl shadow-2xl z-[9999] py-2 text-left"
-            >
-              {courses.find(c => c.id === activeMenu) && (
-                <>
-                  <button
-                    onClick={() => handleOpenEdit(courses.find(c => c.id === activeMenu))}
-                    className="w-full px-4 py-2 text-sm text-gray-200 hover:bg-rose-600 hover:text-white transition-colors text-left flex items-center justify-between"
-                  >
-                    <span>Edit Details</span>
-                    <span>✏️</span>
-                  </button>
-                  <button
-                    onClick={() => handleToggleStatus(courses.find(c => c.id === activeMenu))}
-                    className="w-full px-4 py-2 text-sm text-gray-200 hover:bg-white/10 transition-colors text-left flex items-center justify-between"
-                  >
-                    <span>{courses.find(c => c.id === activeMenu).status === 'published' ? 'Make Draft' : 'Publish'}</span>
-                    <span>{courses.find(c => c.id === activeMenu).status === 'published' ? '🔒' : '🌐'}</span>
-                  </button>
-                  <div className="border-t border-white/10 my-1"></div>
-                  <button
-                    onClick={() => handleDeleteCourse(activeMenu)}
-                    className="w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 transition-colors text-left flex items-center justify-between"
-                  >
-                    <span>Delete Course</span>
-                    <span>🗑️</span>
-                  </button>
-                </>
-              )}
-            </div>
-          )}
         </>
       ) : (
         <form onSubmit={handleSaveCourse} className="space-y-8">
