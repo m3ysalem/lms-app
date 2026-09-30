@@ -31,7 +31,6 @@ export default function CoursePlayer() {
   const [error, setError] = useState('')
 
   const load = useCallback(() => {
-    // تمكين الجلب حتى لو الprofile تأخر قليلا لتفادي توقف الصفحة
     const employeeId = profile?.id || 'guest'
 
     Promise.all([
@@ -44,7 +43,9 @@ export default function CoursePlayer() {
         setLessonProgress(lp || {})
         setCertificate(certs?.find((c) => c.course?.id === courseId || c.course_id === courseId) || null)
         
-        const allL = d?.modules?.flatMap((m) => m.lessons) || []
+        // استخراج جميع الدروس بمرونة تامة للتوافق مع أي هيكل راجع من الـ API
+        const modulesList = d?.modules || []
+        const allL = modulesList.flatMap((m) => m.lessons || m.items || [])
         const firstIncomplete = allL.find((l) => lp?.[l.id]?.status !== 'completed')
         setActiveLessonId(firstIncomplete?.id ?? allL[0]?.id ?? null)
       })
@@ -55,7 +56,12 @@ export default function CoursePlayer() {
     load() 
   }, [load])
 
-  const allLessons = useMemo(() => data?.modules ? data.modules.flatMap((m) => m.lessons) : [], [data])
+  // استخراج الدروس بشكل موحد ومضمون
+  const allLessons = useMemo(() => {
+    if (!data?.modules) return []
+    return data.modules.flatMap((m) => m.lessons || m.items || [])
+  }, [data])
+
   const activeLesson = allLessons.find((l) => l.id === activeLessonId)
   const completedCount = allLessons.filter((l) => lessonProgress[l.id]?.status === 'completed').length
   const percent = allLessons.length ? Math.round((completedCount / allLessons.length) * 100) : 0
@@ -107,31 +113,38 @@ export default function CoursePlayer() {
           {(!data.modules || data.modules.length === 0) ? (
             <p className="text-sm text-gray-500 px-2">No modules found for this course.</p>
           ) : (
-            data.modules.map((m) => (
-              <div key={m.id} className="mb-3 last:mb-0">
-                <p className="text-xs font-bold text-gray-300 px-2 mb-1">{m.title}</p>
-                {m.lessons?.map((l) => {
-                  const status = lessonProgress[l.id]?.status
-                  const isActive = l.id === activeLessonId
-                  return (
-                    <button
-                      key={l.id}
-                      onClick={() => goTo(l.id)}
-                      className={`w-full text-left px-2 py-2 rounded text-sm flex items-center gap-2 transition-all ${
-                        isActive 
-                          ? 'bg-rose-500/20 text-rose-300 font-medium border border-rose-500/30' 
-                          : 'hover:bg-white/5 text-gray-300'
-                      }`}
-                    >
-                      <span className="w-4 shrink-0">
-                        {status === 'completed' ? '✓' : isActive ? '▶' : '○'}
-                      </span>
-                      <span className="truncate">{l.title}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            ))
+            data.modules.map((m) => {
+              const moduleLessons = m.lessons || m.items || []
+              return (
+                <div key={m.id || m.title} className="mb-3 last:mb-0">
+                  <p className="text-xs font-bold text-gray-300 px-2 mb-1">{m.title}</p>
+                  {moduleLessons.length === 0 ? (
+                    <p className="text-xs text-gray-500 px-2 italic">No lessons in this module</p>
+                  ) : (
+                    moduleLessons.map((l) => {
+                      const status = lessonProgress[l.id]?.status
+                      const isActive = l.id === activeLessonId
+                      return (
+                        <button
+                          key={l.id}
+                          onClick={() => goTo(l.id)}
+                          className={`w-full text-left px-2 py-2 rounded text-sm flex items-center gap-2 transition-all ${
+                            isActive 
+                              ? 'bg-rose-500/20 text-rose-300 font-medium border border-rose-500/30' 
+                              : 'hover:bg-white/5 text-gray-300'
+                          }`}
+                        >
+                          <span className="w-4 shrink-0">
+                            {status === 'completed' ? '✓' : isActive ? '▶' : '○'}
+                          </span>
+                          <span className="truncate">{l.title}</span>
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+              )
+            })
           )}
           
           {/* زر الاختبار */}
