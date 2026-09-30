@@ -18,9 +18,9 @@ export default function CourseBuilder() {
     return localStorage.getItem('course_editing_id') || null
   })
   
-  // نظام الإحداثيات للقائمة المنسدلة لتظهر بجوار الزر مباشرة
+  // تم تصحيح علامة الزائد (+) إلى علامة يساوي (=) هنا
   const [activeMenu, setActiveMenu] = useState(null)
-  const [menuPosition, setMenuPosition] + useState({ top: 0, left: 0 })
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
   const menuRef = useRef(null)
 
   const [courseData, setCourseData] = useState(() => {
@@ -212,7 +212,6 @@ export default function CourseBuilder() {
     setActiveMenu(null)
   }
 
-  // حساب دقيق لموقع القائمة بجوار الزر مباشرة (تم ضبط الإحداثيات يساراً)
   const handleMenuToggle = (e, courseId) => {
     e.stopPropagation()
     if (activeMenu === courseId) {
@@ -221,7 +220,7 @@ export default function CourseBuilder() {
       const rect = e.currentTarget.getBoundingClientRect()
       setMenuPosition({
         top: rect.bottom + window.scrollY + 6,
-        left: rect.right + window.scrollX - 190 // محاذاة دقيقة لظهر القائمة أسفل الزر مباشرة
+        left: rect.right + window.scrollX - 190
       })
       setActiveMenu(courseId)
     }
@@ -498,7 +497,6 @@ export default function CourseBuilder() {
             </div>
           </div>
 
-          {/* القائمة العائمة المحدثة لتظهر بدقة بجانب زر العمليات مباشرة */}
           {activeMenu && (
             <div
               ref={menuRef}
