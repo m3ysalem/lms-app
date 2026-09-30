@@ -43,7 +43,6 @@ export default function CoursePlayer() {
         setLessonProgress(lp || {})
         setCertificate(certs?.find((c) => c.course?.id === courseId || c.course_id === courseId) || null)
         
-        // استخراج جميع الدروس بمرونة تامة للتوافق مع أي هيكل راجع من الـ API
         const modulesList = d?.modules || []
         const allL = modulesList.flatMap((m) => m.lessons || m.items || [])
         const firstIncomplete = allL.find((l) => lp?.[l.id]?.status !== 'completed')
@@ -56,7 +55,6 @@ export default function CoursePlayer() {
     load() 
   }, [load])
 
-  // استخراج الدروس بشكل موحد ومضمون
   const allLessons = useMemo(() => {
     if (!data?.modules) return []
     return data.modules.flatMap((m) => m.lessons || m.items || [])
@@ -78,6 +76,7 @@ export default function CoursePlayer() {
       const newCompleted = allLessons.filter((l) => newLp[l.id]?.status === 'completed').length
       const newPercent = allLessons.length ? Math.round((newCompleted / allLessons.length) * 100) : 0
       
+      // هذا السطر يضمن تحديث التقارير وحالة الكورس فوراً في جدول course_progress و course_assignments
       await upsertCourseProgress(profile.id, courseId, newPercent)
 
       const idx = allLessons.findIndex((l) => l.id === activeLesson.id)
@@ -91,7 +90,7 @@ export default function CoursePlayer() {
   if (error) return <div className="text-red-400 p-4">Error: {error}</div>
   if (!data) return <div className="flex justify-center p-12"><Spinner /></div>
 
-  const { course } = data
+  const { course, quizzes } = data
 
   return (
     <div className="space-y-6 text-white">
@@ -147,12 +146,12 @@ export default function CoursePlayer() {
             })
           )}
           
-          {/* زر الاختبار */}
+          {/* زر الاختبار - يتم ربطه بالكورس مباشرة */}
           <Link
             to={`/courses/${courseId}/quiz`}
             className="block mt-4 p-3 rounded-lg bg-teal-600 hover:bg-teal-500 text-center text-white font-bold text-sm transition-colors shadow-lg"
           >
-            📝 Take Course Quiz →
+            📝 Take Course Quiz ({quizzes?.length || 0}) →
           </Link>
         </aside>
 
