@@ -14,8 +14,7 @@ import Profile from './routes/employee/Profile'
 
 import AdminDashboard from './routes/admin/Dashboard'
 import AdminEmployees from './routes/admin/Employees'
-import AdminCourses from './routes/admin/Courses'
-import AdminCourseBuilder from './routes/admin/CourseBuilder'
+import CourseBuilder from './routes/admin/CourseBuilder' // استخدام الملف الموحد الجديد
 import AdminAssignments from './routes/admin/Assignments'
 import AdminReports from './routes/admin/AdminReports'
 
@@ -35,10 +34,12 @@ export default function App() {
 
       {/* Admin-only */}
       <Route path="/admin" element={<RequireAuth><RequireAdmin><Layout><AdminDashboard /></Layout></RequireAdmin></RequireAuth>} />
-      <Route path="/admin/reports" element={<RequireAuth><RequireAdmin><Layout><AdminReports /></Layout></RequireAdmin></RequireAuth>} /> {/* <--- 2. إضافة مسار التقارير هنا */}
+      <Route path="/admin/reports" element={<RequireAuth><RequireAdmin><Layout><AdminReports /></Layout></RequireAdmin></RequireAuth>} />
       <Route path="/admin/employees" element={<RequireAuth><RequireAdmin><Layout><AdminEmployees /></Layout></RequireAdmin></RequireAuth>} />
-      <Route path="/admin/courses" element={<RequireAuth><RequireAdmin><Layout><AdminCourses /></Layout></RequireAdmin></RequireAuth>} />
-      <Route path="/admin/courses/:courseId" element={<RequireAuth><RequireAdmin><Layout><AdminCourseBuilder /></Layout></RequireAdmin></RequireAuth>} />
+      
+      {/* تم دمج شاشات الكورسات في مسار واحد موحد يمنع التكرار */}
+      <Route path="/admin/courses" element={<RequireAuth><RequireAdmin><Layout><CourseBuilder /></Layout></RequireAdmin></RequireAuth>} />
+
       <Route path="/admin/assignments" element={<RequireAuth><RequireAdmin><Layout><AdminAssignments /></Layout></RequireAdmin></RequireAuth>} />
 
       <Route path="*" element={<RequireAuth><Layout><Dashboard /></Layout></RequireAuth>} />
