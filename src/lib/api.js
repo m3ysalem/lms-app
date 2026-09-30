@@ -152,9 +152,9 @@ export async function getPublishedCourses(employeeId) {
   }
 }
 
+// دالة جلب هيكل الكورس بالكامل (مرتبطة بـ course_id مع الاحتياطي لضمان العرض والتقارير)
 export async function getCourseWithStructure(courseId) {
   try {
-    // 1. جلب بيانات الكورس الأساسية
     let { data: course, error: courseErr } = await supabase
       .from('courses')
       .select('*')
@@ -166,7 +166,7 @@ export async function getCourseWithStructure(courseId) {
       return { course: { name: 'Course' }, modules: [], quizzes: [] }
     }
 
-    // 2. جلب المديولات المرتبطة بالكورس أو جلب جميع المديولات كبديل لضمان ظهور المحتوى
+    // جلب المديولات الخاصة بالكورس حصرياً، وإذا لم توجد نجلب الكل احتياطياً
     let { data: modules } = await supabase
       .from('modules')
       .select('*')
@@ -183,7 +183,7 @@ export async function getCourseWithStructure(courseId) {
 
     const moduleIds = modules.map(m => m.id)
 
-    // 3. جلب الدروس التابعة للمديولات أو جلب كل الدروس المتاحة
+    // جلب الدروس التابعة للمديولات
     let lessons = []
     if (moduleIds.length > 0) {
       const { data: lessonsData } = await supabase
@@ -205,8 +205,7 @@ export async function getCourseWithStructure(courseId) {
       lessons = allLessons || []
     }
 
-    // ربط الدروس بالمديولات بدقة
-    let finalModules = modules.map(mod => {
+    const finalModules = modules.map(mod => {
       const modLessons = lessons.filter(l => l.module_id === mod.id)
       return {
         ...mod,
@@ -214,16 +213,16 @@ export async function getCourseWithStructure(courseId) {
       }
     })
 
-    // لو مافيش مديولات خالص، ننشئ مديول افتراضي يضم الدروس المتاحة
-    if (finalModules.length === 0 && lessons.length > 0) {
-      finalModules = [{
-        id: 'default-module',
-        title: 'Course Lessons',
+    let processedModules = finalModules
+    if (processedModules.length === 0 && lessons.length > 0) {
+      processedModules = [{
+        id: 'default-mod',
+        title: 'Course Content',
         lessons: lessons
       }]
     }
 
-    // 4. جلب اختبارات الكورس (مرتبطة أو جلب كل الاختبارات المتاحة كاحتياطي)
+    // جلب اختبارات الكورس المرتبطة بـ course_id
     let { data: quizzes } = await supabase
       .from('quizzes')
       .select('*')
@@ -236,7 +235,7 @@ export async function getCourseWithStructure(courseId) {
 
     return {
       course,
-      modules: finalModules,
+      modules: processedModules,
       quizzes: quizzes || []
     }
   } catch (err) {
@@ -428,7 +427,7 @@ export async function listJobTitles() {
   return data || []
 }
 
-// ---------- Admin: courses ----------
+// ---------- Admin: courses & builder actions ----------
 export async function listAllCourses() {
   const { data, error } = await supabase.from('courses').select('*')
   if (error) throw error
