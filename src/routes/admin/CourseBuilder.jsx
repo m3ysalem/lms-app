@@ -2,10 +2,9 @@ import React, { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 
-export default function CreateCourse() {
+export default function CourseBuilder() {
   const navigate = useNavigate()
   
-  // حفظ واسترجاع وضع العرض من الـ localStorage لكي لا يعود للوضع القديم عند التنقل
   const [viewMode, setViewMode] = useState(() => {
     return localStorage.getItem('course_view_mode') || 'list'
   })
@@ -18,8 +17,10 @@ export default function CreateCourse() {
   const [editingCourseId, setEditingCourseId] = useState(() => {
     return localStorage.getItem('course_editing_id') || null
   })
+  
+  // نظام إحداثيات القائمة المنسدلة لتظهر فوق الجدول تماماً بدون Scroll
   const [activeMenu, setActiveMenu] = useState(null)
-
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
   const menuRef = useRef(null)
 
   const [courseData, setCourseData] = useState(() => {
@@ -59,7 +60,6 @@ export default function CreateCourse() {
     ]
   })
 
-  // حفظ الحالة في الـ localStorage لضمان عدم ضياعها عند التنقل بين الصفحات
   useEffect(() => {
     localStorage.setItem('course_view_mode', viewMode)
   }, [viewMode])
@@ -210,6 +210,20 @@ export default function CreateCourse() {
       alert('Status update failed: ' + err.message)
     }
     setActiveMenu(null)
+  }
+
+  const handleMenuToggle = (e, courseId) => {
+    e.stopPropagation()
+    if (activeMenu === courseId) {
+      setActiveMenu(null)
+    } else {
+      const rect = e.currentTarget.getBoundingClientRect()
+      setMenuPosition({
+        top: rect.bottom + window.scrollY + 4,
+        left: rect.left + window.scrollX - 140 // لضبط محاذاة القائمة لتظهر بشكل مرتب
+      })
+      setActiveMenu(courseId)
+    }
   }
 
   const handleCheckboxChange = (deptId) => {
@@ -439,8 +453,9 @@ export default function CreateCourse() {
             </button>
           </div>
 
-          <div className="bg-[#14181d]/90 border border-white/10 rounded-2xl overflow-hidden shadow-xl mt-6">
-            <div className="overflow-x-auto">
+          {/* تم إزالة الـ overflow المخفي من الحاوية لضمان عدم حبس القائمة المنسدلة */}
+          <div className="bg-[#14181d]/90 border border-white/10 rounded-2xl shadow-xl mt-6">
+            <div className="w-full">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-white/10 bg-black/40 text-gray-400 text-xs uppercase tracking-wider">
@@ -467,40 +482,13 @@ export default function CreateCourse() {
                             {course.status === 'published' ? 'Published' : 'Draft'}
                           </span>
                         </td>
-                        <td className="p-4 text-center relative">
+                        <td className="p-4 text-center">
                           <button
-                            onClick={() => setActiveMenu(activeMenu === course.id ? null : course.id)}
+                            onClick={(e) => handleMenuToggle(e, course.id)}
                             className="p-2 hover:bg-white/10 rounded-lg text-gray-300 transition-colors"
                           >
                             ⋮
                           </button>
-
-                          {activeMenu === course.id && (
-                            <div ref={menuRef} className="absolute right-1/2 translate-x-1/2 mt-2 w-48 bg-[#1e232a] border border-white/10 rounded-xl shadow-2xl z-50 py-2 text-left">
-                              <button
-                                onClick={() => handleOpenEdit(course)}
-                                className="w-full px-4 py-2 text-sm text-gray-200 hover:bg-rose-600 hover:text-white transition-colors text-left flex items-center justify-between"
-                              >
-                                <span>Edit Details</span>
-                                <span>✏️</span>
-                              </button>
-                              <button
-                                onClick={() => handleToggleStatus(course)}
-                                className="w-full px-4 py-2 text-sm text-gray-200 hover:bg-white/10 transition-colors text-left flex items-center justify-between"
-                              >
-                                <span>{course.status === 'published' ? 'Make Draft' : 'Publish'}</span>
-                                <span>{course.status === 'published' ? '🔒' : '🌐'}</span>
-                              </button>
-                              <div className="border-t border-white/10 my-1"></div>
-                              <button
-                                onClick={() => handleDeleteCourse(course.id)}
-                                className="w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 transition-colors text-left flex items-center justify-between"
-                              >
-                                <span>Delete Course</span>
-                                <span>🗑️</span>
-                              </button>
-                            </div>
-                          )}
                         </td>
                       </tr>
                     ))
@@ -509,6 +497,42 @@ export default function CreateCourse() {
               </table>
             </div>
           </div>
+
+          {/* القائمة المنسدلة العائمة (Fixed Dropdown) لتظهر خارج الجدول تماماً وبدون أي Scroll */}
+          {activeMenu && (
+            <div
+              ref={menuRef}
+              style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
+              className="absolute w-48 bg-[#1e232a] border border-white/10 rounded-xl shadow-2xl z-[9999] py-2 text-left"
+            >
+              {courses.find(c => c.id === activeMenu) && (
+                <>
+                  <button
+                    onClick={() => handleOpenEdit(courses.find(c => c.id === activeMenu))}
+                    className="w-full px-4 py-2 text-sm text-gray-200 hover:bg-rose-600 hover:text-white transition-colors text-left flex items-center justify-between"
+                  >
+                    <span>Edit Details</span>
+                    <span>✏️</span>
+                  </button>
+                  <button
+                    onClick={() => handleToggleStatus(courses.find(c => c.id === activeMenu))}
+                    className="w-full px-4 py-2 text-sm text-gray-200 hover:bg-white/10 transition-colors text-left flex items-center justify-between"
+                  >
+                    <span>{courses.find(c => c.id === activeMenu).status === 'published' ? 'Make Draft' : 'Publish'}</span>
+                    <span>{courses.find(c => c.id === activeMenu).status === 'published' ? '🔒' : '🌐'}</span>
+                  </button>
+                  <div className="border-t border-white/10 my-1"></div>
+                  <button
+                    onClick={() => handleDeleteCourse(activeMenu)}
+                    className="w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 transition-colors text-left flex items-center justify-between"
+                  >
+                    <span>Delete Course</span>
+                    <span>🗑️</span>
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </>
       ) : (
         <form onSubmit={handleSaveCourse} className="space-y-8">
