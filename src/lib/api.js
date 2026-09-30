@@ -154,46 +154,69 @@ export async function getPublishedCourses(employeeId) {
 
 export async function getCourseWithStructure(courseId) {
   try {
-    let { data: course } = await supabase
+    // 1. جلب بيانات الكورس الأساسية
+    let { data: course, error: courseErr } = await supabase
       .from('courses')
       .select('*')
       .eq('id', courseId)
       .single()
 
-    if (!course) {
-      const { data: allCourses } = await supabase.from('courses').select('*').limit(1)
-      course = allCourses ? allCourses[0] : { id: courseId, name: 'Course' }
+    if (courseErr || !course) {
+      console.error('Course fetch error:', courseErr)
+      return { course: { name: 'Course' }, modules: [], quizzes: [] }
     }
 
-    // جلب كل المديولات المتاحة في قاعدة البيانات
-    let { data: modules } = await supabase
+    // 2. جلب المديولات الخاصة بهذا الكورس فقط مرتبة حسب الـ sort_order
+    let { data: modules, error: modErr } = await supabase
       .from('modules')
       .select('*')
+      .eq('course_id', courseId)
       .order('sort_order', { ascending: true })
 
+    if (modErr) console.error('Modules fetch error:', modErr)
     modules = modules || []
 
-    // جلب كل الدروس المتاحة في قاعدة البيانات
-    let { data: lessons } = await supabase
-      .from('lessons')
-      .select('*')
-      .order('sort_order', { ascending: true })
+    const moduleIds = modules.map(m => m.id)
 
-    lessons = lessons || []
+    // 3. جلب الدروس التابعة لهذه المديولات فقط
+    let lessons = []
+    if (moduleIds.length > 0) {
+      const { data: lessonsData, error: lessErr } = await supabase
+        .from('lessons')
+        .select('*')
+        .in('module_id', moduleIds)
+        .order('sort_order', { ascending: true })
+      
+      if (!lessErr) lessons = lessonsData || []
+    }
 
-    // ربط الدروس بالمديولات الخاصة بها
+    // ربط الدروس بكل مديول خاص به بدقة
     const finalModules = modules.map(mod => {
       const modLessons = lessons.filter(l => l.module_id === mod.id)
       return {
         ...mod,
-        lessons: modLessons.length > 0 ? modLessons : lessons.filter(l => !l.module_id)
+        lessons: modLessons
       }
     })
 
-    // جلب اختبارات الكورس
-    const { data: quizzes } = await supabase
+    // 4. جلب اختبارات الكورس المرتبطة به مع الأسئلة التابعة لها
+    const { data: quizzes, error: quizErr } = await supabase
       .from('quizzes')
-      .select('*')
+      .select(`
+        *,
+        quiz_questions (
+          id,
+          quiz_id,
+          question_text,
+          options,
+          correct_answer,
+          points,
+          sort_order
+        )
+      `)
+      .eq('course_id', courseId)
+
+    if (quizErr) console.error('Quizzes fetch error:', quizErr)
 
     return {
       course,
@@ -308,7 +331,7 @@ export async function getQuizQuestions(quizId) {
       .from('quiz_questions')
       .select('*')
       .eq('quiz_id', quizId)
-      .order('order_index', { ascending: true })
+      .order('sort_order', { ascending: true })
 
     if (qError || !qData) return []
 
@@ -330,7 +353,7 @@ export async function getQuizQuestions(quizId) {
         id: q.id,
         text: q.question_text || q.text,
         type: q.type || 'multiple_choice',
-        points: q.points || 1,
+        points: q.points || 10,
         correct_answer: q.correct_answer,
         answers: parsedOptions.map((opt, idx) => ({
           id: idx,
