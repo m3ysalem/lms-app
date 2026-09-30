@@ -164,6 +164,9 @@ export default function CreateCourse() {
         })
       })
 
+      // ربط أول قسم مختار بـ department_id الرئيسي لتظهر الكورسات للموظفين فوراً
+      const primaryDeptId = selectedDepts.length > 0 ? selectedDepts[0] : null
+
       const { data: newCourse, error: courseError } = await supabase
         .from('courses')
         .insert([{
@@ -173,7 +176,8 @@ export default function CreateCourse() {
           certificate_eligible: courseData.certificate_eligible,
           required: courseData.required,
           duration: totalCourseDurationMins,
-          status: 'published'
+          status: 'published',
+          department_id: primaryDeptId
         }])
         .select()
         .single()
