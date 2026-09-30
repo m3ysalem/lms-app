@@ -199,21 +199,10 @@ export async function getCourseWithStructure(courseId) {
       }
     })
 
-    // 4. جلب اختبارات الكورس المرتبطة به مع الأسئلة التابعة لها
+    // 4. جلب اختبارات الكورس بشكل آمن بدون أخطاء أعمدة
     const { data: quizzes, error: quizErr } = await supabase
       .from('quizzes')
-      .select(`
-        *,
-        quiz_questions (
-          id,
-          quiz_id,
-          question_text,
-          options,
-          correct_answer,
-          points,
-          sort_order
-        )
-      `)
+      .select('*')
       .eq('course_id', courseId)
 
     if (quizErr) console.error('Quizzes fetch error:', quizErr)
