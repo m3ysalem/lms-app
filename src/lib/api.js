@@ -414,6 +414,27 @@ export async function createEmployee(payload) {
   return data
 }
 
+// تغيير باسورد موظف (عبر Edge Function آمنة)
+export async function setEmployeePassword(userId, password) {
+  const { data, error } = await supabase.functions.invoke('set-employee-password', {
+    body: { user_id: userId, password },
+  })
+
+  if (error) {
+    let message = error.message
+    try {
+      const body = await error.context.json()
+      if (body?.error) message = body.error
+    } catch {
+      // نستخدم الرسالة الافتراضية
+    }
+    throw new Error(message)
+  }
+
+  if (data?.error) throw new Error(data.error)
+  return data
+}
+
 export async function listDepartments() {
   const { data, error } = await supabase.from('departments').select('*')
   if (error) return []
