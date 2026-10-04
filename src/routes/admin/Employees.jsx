@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import Papa from 'papaparse'
 import { supabase } from '../../lib/supabaseClient'
-import { listEmployees, updateEmployee, createEmployee as createEmployeeAccount } from '../../lib/api'
+import { listEmployees, updateEmployee, createEmployee as createEmployeeAccount, setEmployeePassword } from '../../lib/api'
 import { Badge, Spinner } from '../../components/Ui'
 
 const emptyForm = { 
@@ -133,6 +133,21 @@ export default function Employees() {
     const { error } = await supabase.auth.resetPasswordForEmail(emp.email)
     if (error) alert(error.message)
     else alert(`Password reset email sent to ${emp.email}.`)
+  }
+
+  const setPassword = async (emp) => {
+    const newPassword = window.prompt(`New password for ${emp.full_name} (min 6 characters):`)
+    if (newPassword === null) return
+    if (newPassword.length < 6) {
+      alert('Password must be at least 6 characters.')
+      return
+    }
+    try {
+      await setEmployeePassword(emp.id, newPassword)
+      alert(`Password updated for ${emp.full_name}.`)
+    } catch (err) {
+      alert('Failed to set password: ' + err.message)
+    }
   }
 
   const handleCsvImport = (e) => {
@@ -310,6 +325,7 @@ export default function Employees() {
                   <Badge tone={e.is_active ? 'success' : 'danger'}>{e.is_active ? 'Active' : 'Inactive'}</Badge>
                 </td>
                 <td className="px-4 py-2 space-x-3 whitespace-nowrap">
+                  <button className="text-teal text-xs hover:underline" onClick={() => setPassword(e)}>Set password</button>
                   <button className="text-teal text-xs hover:underline" onClick={() => resetPassword(e)}>Reset password</button>
                   <button className="text-danger text-xs hover:underline" onClick={() => toggleActive(e)}>
                     {e.is_active ? 'Deactivate' : 'Reactivate'}
