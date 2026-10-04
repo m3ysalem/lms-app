@@ -80,6 +80,7 @@ export default function AdminReports() {
         { data: progData },
         { data: assignmentsData },
         { data: lessonsData },
+        { data: modulesData },
         { data: lessonProgData },
         { data: certsData },
         { data: quizAttData },
@@ -92,6 +93,7 @@ export default function AdminReports() {
         supabase.from('course_progress').select('*'),
         supabase.from('course_assignments').select('*'),
         supabase.from('lessons').select('*'),
+        supabase.from('modules').select('id, course_id'),
         supabase.from('lesson_progress').select('*'),
         supabase.from('certificates').select('*'),
         supabase.from('quiz_attempts').select('*'),
@@ -111,6 +113,18 @@ export default function AdminReports() {
       const coursesMap = Object.fromEntries((coursesData || []).map(c => [c.id, c]))
       const lessonsMap = Object.fromEntries((lessonsData || []).map(l => [l.id, l]))
       const quizzesMap = Object.fromEntries((quizzesData || []).map(q => [q.id, q]))
+
+      // مدة الكورس: من بيانات الكورس نفسه، وإذا كانت فارغة نجمع مدد الدروس التابعة له
+      const moduleCourseMap = Object.fromEntries((modulesData || []).map(m => [m.id, m.course_id]))
+      const lessonMinutesByCourse = {}
+      ;(lessonsData || []).forEach(l => {
+        const cid = moduleCourseMap[l.module_id]
+        if (!cid) return
+        const mins = parseMinutes(l.duration_minutes) || parseMinutes(l.duration)
+        lessonMinutesByCourse[cid] = (lessonMinutesByCourse[cid] || 0) + mins
+      })
+      const courseMinutes = (course) =>
+        getCourseDurationMinutes(course) || lessonMinutesByCourse[course?.id] || 0
 
       // تصفية صارمة لكل الجداول المرتبطة بالموظفين الموجودين فقط في الـ profiles
       const validProgData = (progData || []).filter(p => validEmployeeIds.has(p.employee_id))
@@ -176,7 +190,7 @@ export default function AdminReports() {
           status,
           course,
           profile: profilesMap[en.employee_id] || {},
-          minutes: getCourseDurationMinutes(course),
+          minutes: courseMinutes(course),
           lastDate,
         }
       })
@@ -221,8 +235,10 @@ export default function AdminReports() {
             ? Math.round(deptEnrollments.reduce((acc, en) => acc + en.percent, 0) / totalAssigned)
             : 0
 
-          const totalMinutes = completedEnrollments.reduce((acc, en) => acc + en.minutes, 0)
-          const totalHours = totalMinutes / 60
+          // ساعات التدريب الفعلية = مدة كل كورس × نسبة التقدم (تشمل الكورسات الجارية)
+          const trainedMinutes = deptEnrollments.reduce((acc, en) => acc + (en.minutes * en.percent) / 100, 0)
+          // إجمالي ساعات الكورسات المعيّنة لموظفي الإدارة
+          const assignedMinutes = deptEnrollments.reduce((acc, en) => acc + en.minutes, 0)
 
           return {
             sortRate: completionRate,
@@ -233,7 +249,8 @@ export default function AdminReports() {
               'Total Courses': countCoursesForDept(group.id),
               'Total Assignments': totalAssigned,
               'Completed Assignments': completedCount,
-              'Total Training Hours': totalHours.toFixed(1) + ' hrs',
+              'Assigned Course Hours': (assignedMinutes / 60).toFixed(1) + ' hrs',
+              'Total Training Hours': (trainedMinutes / 60).toFixed(1) + ' hrs',
               'Avg Progress (%)': avgProgress + '%',
               'Completion Rate (%)': completionRate + '%',
               'Remaining (%)': (totalAssigned > 0 ? 100 - completionRate : 0) + '%',
@@ -270,7 +287,7 @@ export default function AdminReports() {
           const avgProgress = enrolled > 0
             ? Math.round(cEnroll.reduce((acc, en) => acc + en.percent, 0) / enrolled)
             : 0
-          const durationMins = getCourseDurationMinutes(c)
+          const durationMins = courseMinutes(c)
 
           return {
             'Course Code': c.course_code || (c.id ? c.id.substring(0, 8) : 'N/A'),
