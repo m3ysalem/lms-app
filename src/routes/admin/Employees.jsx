@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import Papa from 'papaparse'
 import { supabase } from '../../lib/supabaseClient'
-import { listEmployees, updateEmployee } from '../../lib/api'
+import { listEmployees, updateEmployee, createEmployee as createEmployeeAccount } from '../../lib/api'
 import { Badge, Spinner } from '../../components/Ui'
 
 const emptyForm = { 
@@ -69,55 +69,19 @@ export default function Employees() {
 
       const finalPassword = form.password || 'Password123!'
 
-      // 1. حفظ جلسة الأدمن الحالي قبل أي خطوة
-      const { data: { session: adminSession } } = await supabase.auth.getSession()
-
-      // 2. إنشاء المستخدم الجديد بالطريقة الرسمية السليمة من Supabase
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // إنشاء المستخدم في Authentication بباسورد حقيقي + صف البروفايل في public.profiles
+      // (يتم عبر Edge Function آمنة، فلا تتأثر جلسة الأدمن الحالية)
+      await createEmployeeAccount({
         email: finalEmail,
         password: finalPassword,
-        options: {
-          data: {
-            employee_id: form.employee_id.trim(),
-            full_name: form.full_name
-          }
-        }
+        full_name: form.full_name,
+        role: form.role,
+        employee_id: form.employee_id.trim(),
+        phone: form.phone || null,
+        department: form.department || null,
+        job_title: form.job_title || null,
+        hire_date: form.hire_date || null,
       })
-
-      if (authError) throw authError
-
-      const userId = authData.user?.id
-      if (!userId) {
-        throw new Error('Failed to create authentication user ID.')
-      }
-
-      // 3. إدخال البروفايل في جدول public.profiles
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([
-          {
-            id: userId,
-            employee_id: form.employee_id.trim(),
-            full_name: form.full_name,
-            phone: form.phone || null,
-            email: finalEmail,
-            role: form.role,
-            department: form.department || null,
-            job_title: form.job_title || null,
-            hire_date: form.hire_date || null,
-            is_active: true
-          }
-        ])
-
-      if (profileError) throw profileError
-
-      // 4. استعادة جلسة الأدمن فوراً لضمان بقائه في لوحة التحكم
-      if (adminSession) {
-        await supabase.auth.setSession({
-          access_token: adminSession.access_token,
-          refresh_token: adminSession.refresh_token
-        })
-      }
 
       setSaving(false)
       setShowForm(false)
@@ -182,9 +146,6 @@ export default function Employees() {
         const errors = []
         let success = 0
 
-        // حفظ جلسة الأدمن قبل البدء في الـ Loop للرفع الجماعي
-        const { data: { session: adminSession } } = await supabase.auth.getSession()
-
         for (const row of rows) {
           if (!row['Name'] || !row['Employee ID']) {
             errors.push(`Skipped row — missing Name or Employee ID: ${JSON.stringify(row)}`)
@@ -196,53 +157,23 @@ export default function Employees() {
             const rowEmail = row['Email']?.trim() || `emp_${empId}@alesraa.com`
             const rowPassword = row['Password'] || 'Password123!'
 
-            const { data: authData, error: authError } = await supabase.auth.signUp({
+            // إنشاء المستخدم في Authentication بباسورد حقيقي + صف البروفايل (عبر Edge Function)
+            await createEmployeeAccount({
               email: rowEmail,
               password: rowPassword,
-              options: {
-                data: {
-                  employee_id: empId,
-                  full_name: row['Name']
-                }
-              }
+              full_name: row['Name'],
+              role: row['Role'] || 'employee',
+              employee_id: empId,
+              phone: row['Phone'] || null,
+              department: row['Department'] || null,
+              job_title: row['Job Title'] || null,
+              hire_date: row['Hire Date'] || null,
             })
-
-            if (authError) throw authError
-
-            const userId = authData.user?.id
-            if (!userId) throw new Error('Auth ID missing')
-
-            const { error: profileError } = await supabase
-              .from('profiles')
-              .insert([
-                {
-                  id: userId,
-                  employee_id: empId,
-                  full_name: row['Name'],
-                  phone: row['Phone'] || null,
-                  email: rowEmail,
-                  role: row['Role'] || 'employee',
-                  department: row['Department'] || null,
-                  job_title: row['Job Title'] || null,
-                  hire_date: row['Hire Date'] || null,
-                  is_active: true
-                }
-              ])
-
-            if (profileError) throw profileError
 
             success++
           } catch (err) {
             errors.push(`${row['Employee ID']}: ${err.message}`)
           }
-        }
-
-        // استعادة جلسة الأدمن بعد انتهاء الـ Loop
-        if (adminSession) {
-          await supabase.auth.setSession({
-            access_token: adminSession.access_token,
-            refresh_token: adminSession.refresh_token
-          })
         }
 
         setImportResult({ success, errors })
