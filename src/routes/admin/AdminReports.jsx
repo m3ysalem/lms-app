@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { Spinner } from '../../components/Ui'
 import { Link } from 'react-router-dom'
@@ -13,49 +13,84 @@ const REPORTS_TABS = [
   { id: 'assessment', label: 'Assessment Report' },
 ]
 
+// الجداول التي يتم الاشتراك في تغييراتها لتحديث التقارير تلقائياً
+const LIVE_TABLES = [
+  'profiles',
+  'departments',
+  'courses',
+  'course_departments',
+  'course_progress',
+  'course_assignments',
+  'lesson_progress',
+  'certificates',
+  'quiz_attempts',
+]
+
+const DONE_STATUSES = ['completed', 'complete', 'finished']
+const isDoneStatus = (s) => DONE_STATUSES.includes(String(s || '').toLowerCase())
+
+const formatDate = (v) => (v ? new Date(v).toLocaleDateString() : 'N/A')
+const formatDateTime = (v) => (v ? new Date(v).toLocaleString() : 'N/A')
+
+// تحويل أي قيمة مدة (رقم أو نص مثل "1h 30m") إلى دقائق
+const parseMinutes = (rawVal) => {
+  if (rawVal === null || rawVal === undefined || rawVal === '') return 0
+
+  const num = Number(rawVal)
+  if (!isNaN(num)) return num > 0 ? num : 0
+
+  const strVal = String(rawVal).toLowerCase()
+  let totalMins = 0
+  const hourMatch = strVal.match(/(\d+)\s*(h|hr|hour|ساعة)/)
+  const minMatch = strVal.match(/(\d+)\s*(m|min|minute|دقيقة)/)
+
+  if (hourMatch) totalMins += parseInt(hourMatch[1]) * 60
+  if (minMatch) totalMins += parseInt(minMatch[1])
+
+  return totalMins > 0 ? totalMins : 0
+}
+
+// استخراج عدد الدقائق من أي كورس بغض النظر عن اسم الحقل أو صيغته
+const getCourseDurationMinutes = (course) => {
+  if (!course) return 0
+  const candidates = [course.duration_minutes, course.duration, course.duration_mins, course.minutes, course.time]
+  for (const v of candidates) {
+    const mins = parseMinutes(v)
+    if (mins > 0) return mins
+  }
+  return 0
+}
+
 export default function AdminReports() {
   const [activeTab, setActiveTab] = useState('completion')
   const [loadingReport, setLoadingReport] = useState(false)
   const [reportData, setReportData] = useState([])
-
-  // دالة ذكية لاستخراج عدد الدقائق من أي كورس بغض النظر عن اسم الحقل أو صيغته
-  const getCourseDurationMinutes = (course) => {
-    if (!course) return 0
-    const rawVal = course.duration ?? course.duration_mins ?? course.minutes ?? course.time ?? 0
-    
-    const num = Number(rawVal)
-    if (!isNaN(num) && num > 0) {
-      return num
-    }
-    
-    const strVal = String(rawVal).toLowerCase()
-    let totalMins = 0
-    const hourMatch = strVal.match(/(\d+)\s*(h|hr|hour|ساعة)/)
-    const minMatch = strVal.match(/(\d+)\s*(m|min|minute|دقيقة)/)
-    
-    if (hourMatch) totalMins += parseInt(hourMatch[1]) * 60
-    if (minMatch) totalMins += parseInt(minMatch[1])
-    
-    return totalMins > 0 ? totalMins : 0
-  }
+  const requestRef = useRef(0)
 
   // جلب وتجهيز بيانات التقارير بشكل دقيق ومفلتر ومتكامل
-  const fetchReportData = async (tab) => {
-    setLoadingReport(true)
+  const fetchReportData = async (tab, silent = false) => {
+    const reqId = ++requestRef.current
+    if (!silent) setLoadingReport(true)
     try {
       const [
-        { data: profilesData }, 
-        { data: coursesData }, 
-        { data: progData }, 
-        { data: lessonsData }, 
-        { data: lessonProgData }, 
-        { data: certsData }, 
-        { data: quizAttData }, 
-        { data: quizzesData }
+        { data: profilesData },
+        { data: departmentsData },
+        { data: coursesData },
+        { data: courseDeptData },
+        { data: progData },
+        { data: assignmentsData },
+        { data: lessonsData },
+        { data: lessonProgData },
+        { data: certsData },
+        { data: quizAttData },
+        { data: quizzesData },
       ] = await Promise.all([
-        supabase.from('profiles').select('*'),
+        supabase.from('profiles').select('id, full_name, email, role, department_id, department, is_active'),
+        supabase.from('departments').select('*'),
         supabase.from('courses').select('*'),
+        supabase.from('course_departments').select('*'),
         supabase.from('course_progress').select('*'),
+        supabase.from('course_assignments').select('*'),
         supabase.from('lessons').select('*'),
         supabase.from('lesson_progress').select('*'),
         supabase.from('certificates').select('*'),
@@ -63,8 +98,15 @@ export default function AdminReports() {
         supabase.from('quizzes').select('*'),
       ])
 
-      const profilesMap = Object.fromEntries((profilesData || []).map(p => [p.id, p]))
+      if (reqId !== requestRef.current) return
+
+      const profiles = profilesData || []
+      const profilesMap = Object.fromEntries(profiles.map(p => [p.id, p]))
       const validEmployeeIds = new Set(Object.keys(profilesMap))
+
+      const deptMap = Object.fromEntries((departmentsData || []).map(d => [d.id, d.name]))
+      const getDeptName = (p) => (p && (deptMap[p.department_id] || p.department)) || null
+      const deptLabel = (p) => getDeptName(p) || 'N/A'
 
       const coursesMap = Object.fromEntries((coursesData || []).map(c => [c.id, c]))
       const lessonsMap = Object.fromEntries((lessonsData || []).map(l => [l.id, l]))
@@ -72,97 +114,173 @@ export default function AdminReports() {
 
       // تصفية صارمة لكل الجداول المرتبطة بالموظفين الموجودين فقط في الـ profiles
       const validProgData = (progData || []).filter(p => validEmployeeIds.has(p.employee_id))
+      const validAssignments = (assignmentsData || []).filter(a => validEmployeeIds.has(a.employee_id))
       const validLessonProg = (lessonProgData || []).filter(p => validEmployeeIds.has(p.employee_id))
       const validCerts = (certsData || []).filter(c => validEmployeeIds.has(c.employee_id))
       const validQuizAttempts = (quizAttData || []).filter(q => validEmployeeIds.has(q.employee_id))
 
+      // دمج التعيينات مع التقدم: كل (موظف + كورس) سجل واحد
+      const enrollMap = new Map()
+      const keyOf = (empId, courseId) => `${empId}|${courseId}`
+
+      validAssignments.forEach(a => {
+        if (!coursesMap[a.course_id]) return
+        enrollMap.set(keyOf(a.employee_id, a.course_id), {
+          employee_id: a.employee_id,
+          course_id: a.course_id,
+          assignment: a,
+          progress: null,
+        })
+      })
+
+      validProgData.forEach(p => {
+        if (!coursesMap[p.course_id]) return
+        const k = keyOf(p.employee_id, p.course_id)
+        const existing = enrollMap.get(k)
+        if (existing) {
+          existing.progress = p
+        } else {
+          enrollMap.set(k, {
+            employee_id: p.employee_id,
+            course_id: p.course_id,
+            assignment: null,
+            progress: p,
+          })
+        }
+      })
+
+      const enrollments = Array.from(enrollMap.values()).map(en => {
+        const rawPercent = Number(en.progress?.progress_percent || 0)
+        const completed =
+          rawPercent >= 100 ||
+          isDoneStatus(en.progress?.status) ||
+          isDoneStatus(en.assignment?.status)
+        const percent = completed ? 100 : Math.min(Math.max(rawPercent, 0), 100)
+        const assignmentStatus = String(en.assignment?.status || '').toLowerCase()
+        const status = completed
+          ? 'Completed'
+          : (percent > 0 || assignmentStatus === 'in_progress' ? 'In Progress' : 'Not Started')
+        const course = coursesMap[en.course_id]
+        const lastDate =
+          en.progress?.completed_at ||
+          en.progress?.last_accessed_at ||
+          en.progress?.started_at ||
+          en.assignment?.assigned_date ||
+          en.assignment?.created_at ||
+          null
+
+        return {
+          ...en,
+          percent,
+          completed,
+          status,
+          course,
+          profile: profilesMap[en.employee_id] || {},
+          minutes: getCourseDurationMinutes(course),
+          lastDate,
+        }
+      })
+
       let data = []
 
       if (tab === 'department') {
-        const uniqueDepts = [...new Set((profilesData || []).map(p => p.department).filter(Boolean))]
+        const employees = profiles.filter(p => p.role === 'employee')
 
-        data = uniqueDepts.map(deptName => {
-          // فلترة الأقسام بحيث نأخذ فقط الأقسام التي بها موظفين فعليين
-          const deptEmployees = (profilesData || []).filter(p => p.department === deptName && p.role === 'employee')
-          
-          if (deptEmployees.length === 0) return null
+        const publishedCourses = (coursesData || []).filter(c => String(c.status || '').toLowerCase() === 'published')
+        const linksByCourse = {}
+        ;(courseDeptData || []).forEach(l => {
+          if (!linksByCourse[l.course_id]) linksByCourse[l.course_id] = new Set()
+          linksByCourse[l.course_id].add(l.department_id)
+        })
+        const countCoursesForDept = (deptId) =>
+          publishedCourses.filter(c =>
+            !c.department_id ||
+            (deptId && (c.department_id === deptId || linksByCourse[c.id]?.has(deptId)))
+          ).length
 
-          const empIds = deptEmployees.map(e => e.id)
-          const empProgress = validProgData.filter(p => empIds.includes(p.employee_id))
-          
-          const completedProgress = empProgress.filter(p => 
-            p.status === 'completed' || 
-            p.status === 'Complete' || 
-            p.status === 'Finished' || 
-            Number(p.progress_percent) >= 100
-          )
+        // كل الإدارات المسجلة + أي إدارة نصية موجودة عند الموظفين + غير المصنفين
+        const groups = new Map()
+        ;(departmentsData || []).forEach(d => {
+          if (d.name) groups.set(d.name, { id: d.id })
+        })
+        employees.forEach(p => {
+          const name = getDeptName(p) || 'Unassigned'
+          if (!groups.has(name)) groups.set(name, { id: null })
+        })
 
-          const totalMinutes = completedProgress.reduce((acc, curr) => {
-            const course = coursesMap[curr.course_id] || {}
-            return acc + getCourseDurationMinutes(course)
-          }, 0)
+        const rows = Array.from(groups.entries()).map(([deptName, group]) => {
+          const deptEmployees = employees.filter(p => (getDeptName(p) || 'Unassigned') === deptName)
+          const empIds = new Set(deptEmployees.map(e => e.id))
+          const deptEnrollments = enrollments.filter(en => empIds.has(en.employee_id))
+          const completedEnrollments = deptEnrollments.filter(en => en.completed)
 
-          const totalHours = totalMinutes > 0 ? (totalMinutes / 60) : 0
-          const totalAssigned = empProgress.length
-          const completedCount = completedProgress.length
-          const successRate = totalAssigned > 0 ? Math.round((completedCount / totalAssigned) * 100) : 0
-          const failureRate = totalAssigned > 0 ? 100 - successRate : 0
+          const totalAssigned = deptEnrollments.length
+          const completedCount = completedEnrollments.length
+          const completionRate = totalAssigned > 0 ? Math.round((completedCount / totalAssigned) * 100) : 0
+          const avgProgress = totalAssigned > 0
+            ? Math.round(deptEnrollments.reduce((acc, en) => acc + en.percent, 0) / totalAssigned)
+            : 0
+
+          const totalMinutes = completedEnrollments.reduce((acc, en) => acc + en.minutes, 0)
+          const totalHours = totalMinutes / 60
 
           return {
-            'Department Name': deptName,
-            'Total Employees': deptEmployees.length,
-            'Total Courses': (coursesData || []).length,
-            'Total Training Hours': totalHours > 0 ? totalHours.toFixed(1) + ' hrs' : '0.0 hrs',
-            'Completed Assignments': completedCount,
-            'Success Rate (%)': successRate + '%',
-            'Incomplete / Failure Rate (%)': failureRate + '%'
+            sortRate: completionRate,
+            sortEmployees: deptEmployees.length,
+            row: {
+              'Department Name': deptName,
+              'Total Employees': deptEmployees.length,
+              'Total Courses': countCoursesForDept(group.id),
+              'Total Assignments': totalAssigned,
+              'Completed Assignments': completedCount,
+              'Total Training Hours': totalHours.toFixed(1) + ' hrs',
+              'Avg Progress (%)': avgProgress + '%',
+              'Completion Rate (%)': completionRate + '%',
+              'Remaining (%)': (totalAssigned > 0 ? 100 - completionRate : 0) + '%',
+            },
           }
-        }).filter(Boolean)
+        })
+
+        rows.sort((a, b) => b.sortRate - a.sortRate || b.sortEmployees - a.sortEmployees)
+        data = rows.map(r => r.row)
       } else if (tab === 'completion') {
-        data = validProgData.map(item => {
-          const course = coursesMap[item.course_id] || {}
-          const profile = profilesMap[item.employee_id] || {}
-          
-          const isCompleted = Number(item.progress_percent || 0) >= 100 || item.status === 'completed'
-          
-          return {
-            'Employee Name': profile.full_name || profile.email || 'N/A',
-            'Department': profile.department || 'N/A',
-            'Course Name': course.name || 'N/A',
-            'Status': isCompleted ? 'Completed' : (item.status || 'In Progress'),
-            'Progress (%)': (item.progress_percent || 0) + '%'
-          }
-        })
+        data = enrollments.map(en => ({
+          'Employee Name': en.profile.full_name || en.profile.email || 'N/A',
+          'Department': deptLabel(en.profile),
+          'Course Name': en.course?.name || 'N/A',
+          'Duration': en.minutes > 0 ? `${en.minutes} mins` : 'N/A',
+          'Status': en.status,
+          'Progress (%)': en.percent + '%',
+        }))
       } else if (tab === 'employee_history') {
-        data = validProgData.map(item => {
-          const course = coursesMap[item.course_id] || {}
-          const profile = profilesMap[item.employee_id] || {}
-          const isCompleted = Number(item.progress_percent || 0) >= 100 || item.status === 'completed'
-          return {
-            'Employee': profile.full_name || 'N/A',
-            'Department': profile.department || 'N/A',
-            'Course Code': course.id ? course.id.substring(0, 8) : 'N/A',
-            'Course Name': course.name || 'N/A',
-            'Current Status': isCompleted ? 'Completed' : (item.status || 'Active'),
-            'Last Updated': item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A'
-          }
-        })
+        data = enrollments.map(en => ({
+          'Employee': en.profile.full_name || 'N/A',
+          'Department': deptLabel(en.profile),
+          'Course Code': en.course?.course_code || (en.course?.id ? en.course.id.substring(0, 8) : 'N/A'),
+          'Course Name': en.course?.name || 'N/A',
+          'Current Status': en.status,
+          'Last Updated': formatDate(en.lastDate),
+        }))
       } else if (tab === 'course_performance') {
         data = (coursesData || []).map(c => {
-          const cProg = validProgData.filter(p => p.course_id === c.id)
-          const enrolled = cProg.length
-          const completed = cProg.filter(p => p.status === 'completed' || Number(p.progress_percent) >= 100).length
+          const cEnroll = enrollments.filter(en => en.course_id === c.id)
+          const enrolled = cEnroll.length
+          const completed = cEnroll.filter(en => en.completed).length
           const passRate = enrolled > 0 ? Math.round((completed / enrolled) * 100) : 0
+          const avgProgress = enrolled > 0
+            ? Math.round(cEnroll.reduce((acc, en) => acc + en.percent, 0) / enrolled)
+            : 0
           const durationMins = getCourseDurationMinutes(c)
-          
+
           return {
-            'Course Code': c.id ? c.id.substring(0, 8) : 'N/A',
+            'Course Code': c.course_code || (c.id ? c.id.substring(0, 8) : 'N/A'),
             'Course Name': c.name || 'N/A',
             'Status': c.status || 'N/A',
-            'Duration': durationMins > 0 ? `${durationMins} mins` : (c.duration || 'N/A'),
+            'Duration': durationMins > 0 ? `${durationMins} mins` : 'N/A',
             'Total Enrolled': enrolled,
             'Completed Count': completed,
-            'Success Rate': passRate + '%'
+            'Avg Progress': avgProgress + '%',
+            'Success Rate': passRate + '%',
           }
         })
       } else if (tab === 'attendance') {
@@ -171,10 +289,10 @@ export default function AdminReports() {
           const profile = profilesMap[item.employee_id] || {}
           return {
             'Employee Name': profile.full_name || 'N/A',
-            'Department': profile.department || 'N/A',
+            'Department': deptLabel(profile),
             'Lesson Title': lesson.title || 'N/A',
             'Status': item.status || 'Viewed',
-            'Date Attended': item.updated_at ? new Date(item.updated_at).toLocaleString() : 'N/A'
+            'Date Attended': formatDateTime(item.completed_at || item.updated_at || item.created_at),
           }
         })
       } else if (tab === 'certificates') {
@@ -183,22 +301,30 @@ export default function AdminReports() {
           const profile = profilesMap[item.employee_id] || {}
           return {
             'Employee Name': profile.full_name || 'N/A',
-            'Department': profile.department || 'N/A',
-            'Course Name': course.name || 'N/A',
-            'Issue Date': item.issued_at ? new Date(item.issued_at).toLocaleDateString() : 'N/A'
+            'Department': deptLabel(profile),
+            'Course Name': course.name || item.course_name || 'N/A',
+            'Issue Date': formatDate(item.issued_date || item.created_at),
           }
         })
       } else if (tab === 'assessment') {
         data = validQuizAttempts.map(item => {
           const quiz = quizzesMap[item.quiz_id] || {}
           const profile = profilesMap[item.employee_id] || {}
+          let scorePercent = null
+          if (item.percentage !== null && item.percentage !== undefined) {
+            scorePercent = Math.round(Number(item.percentage))
+          } else if (Number(item.total_points) > 0 && item.score_points !== null && item.score_points !== undefined) {
+            scorePercent = Math.round((Number(item.score_points) / Number(item.total_points)) * 100)
+          }
+          const submitted = !!item.submitted_at
           return {
             'Employee Name': profile.full_name || 'N/A',
-            'Department': profile.department || 'N/A',
+            'Department': deptLabel(profile),
             'Quiz Title': quiz.title || 'N/A',
-            'Score (%)': item.score ?? 'N/A',
-            'Result': item.passed ? 'Passed' : 'Failed',
-            'Attempt Date': item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A'
+            'Attempt #': item.attempt_number ?? 1,
+            'Score (%)': scorePercent !== null ? scorePercent + '%' : 'N/A',
+            'Result': item.passed ? 'Passed' : (submitted ? 'Failed' : 'In Progress'),
+            'Attempt Date': formatDate(item.submitted_at || item.started_at),
           }
         })
       }
@@ -206,14 +332,35 @@ export default function AdminReports() {
       setReportData(data)
     } catch (err) {
       console.error('Error fetching report:', err)
-      setReportData([])
+      if (reqId === requestRef.current) setReportData([])
     } finally {
-      setLoadingReport(false)
+      if (reqId === requestRef.current) setLoadingReport(false)
     }
   }
 
+  // تحميل التقرير + تحديث تلقائي عند أي تغيير في البيانات (Realtime) + تحديث دوري احتياطي
   useEffect(() => {
     fetchReportData(activeTab)
+
+    let timer = null
+    const refresh = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => fetchReportData(activeTab, true), 700)
+    }
+
+    const channel = supabase.channel(`reports-live-${activeTab}`)
+    LIVE_TABLES.forEach(table => {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table }, refresh)
+    })
+    channel.subscribe()
+
+    const interval = setInterval(() => fetchReportData(activeTab, true), 30000)
+
+    return () => {
+      clearTimeout(timer)
+      clearInterval(interval)
+      supabase.removeChannel(channel)
+    }
   }, [activeTab])
 
   // تصدير التقرير الحالي لملف Excel (CSV)
@@ -229,8 +376,8 @@ export default function AdminReports() {
 
     reportData.forEach(row => {
       const values = keys.map(key => {
-        let val = row[key]
-        return `"${String(val || '').replace(/"/g, '""')}"`
+        const val = row[key]
+        return `"${String(val ?? '').replace(/"/g, '""')}"`
       })
       csvContent += values.join(',') + '\n'
     })
