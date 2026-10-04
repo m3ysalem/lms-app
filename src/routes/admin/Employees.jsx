@@ -3,6 +3,7 @@ import Papa from 'papaparse'
 import { supabase } from '../../lib/supabaseClient'
 import { listEmployees, updateEmployee, createEmployee as createEmployeeAccount, setEmployeePassword } from '../../lib/api'
 import { Badge, Spinner } from '../../components/Ui'
+import { DEPARTMENTS_LIST } from '../../lib/departments'
 
 const emptyForm = { 
   employee_id: '', 
@@ -15,29 +16,6 @@ const emptyForm = {
   hire_date: '', 
   password: 'Password123!' 
 }
-
-const DEPARTMENTS_LIST = [
-  'Promotion',
-  'Finance',
-  'Sales & Distribution',
-  'HR',
-  'Supply Chain',
-  'Registration',
-  'IT',
-  'Commercial & Compliance',
-  'Marketing & Business Development',
-  'R&D',
-  'Management',
-  'QA',
-  'Production',
-  'Pharmacovigilance',
-  'Engineering',
-  'Events & Conferences',
-  'QC',
-  'Odoo',
-  'New Products On-Boarding',
-  'Digital Marketing'
-]
 
 export default function Employees() {
   const [employees, setEmployees] = useState(null)
