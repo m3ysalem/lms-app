@@ -75,9 +75,18 @@ export async function downloadCertificatePdf(cert) {
     safeDrawText(cert.trainer_name, { x: 100, y: 112, size: 10, font: bodyFont, color: gray })
   }
 
-  // تاريخ الإصدار
+  // تاريخ الإصدار - في هامش الصفحة السفلي (منتصف الصفحة) بعيداً عن توقيع الـ HR Manager
   if (cert.issued_date) {
-    safeDrawText(cert.issued_date, { x: 542, y: 112, size: 10, font: bodyFont, color: gray })
+    const dateText = `Issued: ${cert.issued_date}`
+    const dateSize = 9
+    const dateWidth = bodyFont.widthOfTextAtSize(dateText, dateSize)
+    safeDrawText(dateText, {
+      x: 421 - dateWidth / 2,
+      y: 50,
+      size: dateSize,
+      font: bodyFont,
+      color: gray,
+    })
   }
 
   // رقم الشهادة
