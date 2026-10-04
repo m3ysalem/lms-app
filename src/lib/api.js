@@ -128,22 +128,32 @@ export async function getPublishedCourses(employeeId) {
       userDeptId = profile?.department_id;
     }
 
-    let query = supabase
-      .from('courses')
-      .select('*')
-      .eq('status', 'published');
-
+    // الكورسات المربوطة بقسم الموظف عبر جدول course_departments (اختيار أكثر من قسم)
+    let deptCourseIds = [];
     if (userDeptId) {
-      query = query.or(`department_id.eq.${userDeptId},department_id.is.null`);
-    } else {
-      query = query.is('department_id', null);
+      const { data: links, error: linksErr } = await supabase
+        .from('course_departments')
+        .select('course_id')
+        .eq('department_id', userDeptId);
+
+      if (linksErr) console.warn('course_departments fetch warning:', linksErr.message);
+      deptCourseIds = (links || []).map(l => l.course_id);
     }
 
-    const { data, error } = await query;
+    // شرط الظهور: كورس عام OR قسم الموظف في department_id OR مربوط بقسمه في course_departments
+    const conditions = ['department_id.is.null'];
+    if (userDeptId) conditions.push(`department_id.eq.${userDeptId}`);
+    if (deptCourseIds.length > 0) conditions.push(`id.in.(${deptCourseIds.join(',')})`);
+
+    const { data, error } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('status', 'published')
+      .or(conditions.join(','));
 
     if (error) {
-      const { data: allCourses } = await supabase.from('courses').select('*');
-      return allCourses || [];
+      console.error('getPublishedCourses query error:', error);
+      return [];
     }
     return data || [];
   } catch (err) {
