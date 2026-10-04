@@ -176,21 +176,14 @@ export async function getCourseWithStructure(courseId) {
       return { course: { name: 'Course' }, modules: [], quizzes: [] }
     }
 
-    // جلب المديولات الخاصة بالكورس حصرياً، وإذا لم توجد نجلب الكل احتياطياً
-    let { data: modules } = await supabase
+    // جلب المديولات الخاصة بالكورس حصرياً
+    const { data: modulesData } = await supabase
       .from('modules')
       .select('*')
       .eq('course_id', courseId)
       .order('sort_order', { ascending: true })
 
-    if (!modules || modules.length === 0) {
-      const { data: allModules } = await supabase
-        .from('modules')
-        .select('*')
-        .order('sort_order', { ascending: true })
-      modules = allModules || []
-    }
-
+    const modules = modulesData || []
     const moduleIds = modules.map(m => m.id)
 
     // جلب الدروس التابعة للمديولات
@@ -207,41 +200,16 @@ export async function getCourseWithStructure(courseId) {
       }
     }
 
-    if (lessons.length === 0) {
-      const { data: allLessons } = await supabase
-        .from('lessons')
-        .select('*')
-        .order('sort_order', { ascending: true })
-      lessons = allLessons || []
-    }
+    const processedModules = modules.map(mod => ({
+      ...mod,
+      lessons: lessons.filter(l => l.module_id === mod.id)
+    }))
 
-    const finalModules = modules.map(mod => {
-      const modLessons = lessons.filter(l => l.module_id === mod.id)
-      return {
-        ...mod,
-        lessons: modLessons.length > 0 ? modLessons : lessons
-      }
-    })
-
-    let processedModules = finalModules
-    if (processedModules.length === 0 && lessons.length > 0) {
-      processedModules = [{
-        id: 'default-mod',
-        title: 'Course Content',
-        lessons: lessons
-      }]
-    }
-
-    // جلب اختبارات الكورس المرتبطة بـ course_id
-    let { data: quizzes } = await supabase
+    // جلب اختبارات الكورس المرتبطة بـ course_id حصرياً
+    const { data: quizzes } = await supabase
       .from('quizzes')
       .select('*')
       .eq('course_id', courseId)
-
-    if (!quizzes || quizzes.length === 0) {
-      const { data: allQuizzes } = await supabase.from('quizzes').select('*')
-      quizzes = allQuizzes || []
-    }
 
     return {
       course,
@@ -530,7 +498,9 @@ export async function assignCourse({ courseId, employeeIds, assignedBy, dueDate,
     due_date: dueDate || null,
     is_mandatory: mandatory,
   }))
-  const { error } = await supabase.course_assignments.upsert(rows, { onConflict: 'course_id,employee_id', ignoreDuplicates: true })
+  const { error } = await supabase
+    .from('course_assignments')
+    .upsert(rows, { onConflict: 'course_id,employee_id', ignoreDuplicates: true })
   if (error) throw error
 }
 
