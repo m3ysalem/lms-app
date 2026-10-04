@@ -393,6 +393,27 @@ export async function updateEmployee(id, patch) {
   if (error) throw error
 }
 
+// إنشاء موظف: مستخدم في Authentication بباسورد حقيقي + صف في profiles (عبر Edge Function آمنة)
+export async function createEmployee(payload) {
+  const { data, error } = await supabase.functions.invoke('create-employee', {
+    body: payload,
+  })
+
+  if (error) {
+    let message = error.message
+    try {
+      const body = await error.context.json()
+      if (body?.error) message = body.error
+    } catch {
+      // نستخدم الرسالة الافتراضية
+    }
+    throw new Error(message)
+  }
+
+  if (data?.error) throw new Error(data.error)
+  return data
+}
+
 export async function listDepartments() {
   const { data, error } = await supabase.from('departments').select('*')
   if (error) return []
