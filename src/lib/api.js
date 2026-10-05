@@ -393,6 +393,21 @@ export async function updateEmployee(id, patch) {
   if (error) throw error
 }
 
+// تعديل بيانات موظف من لوحة الأدمن (نقل الإدارة، الدور، ...) عبر دالة آمنة في قاعدة البيانات
+export async function updateEmployeeProfile(id, fields) {
+  const { error } = await supabase.rpc('admin_update_employee', {
+    target_id: id,
+    new_name: fields.full_name,
+    new_phone: fields.phone || '',
+    new_contact_email: fields.contact_email || '',
+    new_department: fields.department || '',
+    new_job_title: fields.job_title || '',
+    new_hire_date: fields.hire_date || null,
+    new_role: fields.role,
+  })
+  if (error) throw new Error(error.message)
+}
+
 // إنشاء موظف: مستخدم في Authentication بباسورد حقيقي + صف في profiles (عبر Edge Function آمنة)
 export async function createEmployee(payload) {
   const { data, error } = await supabase.functions.invoke('create-employee', {
