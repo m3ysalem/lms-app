@@ -24,21 +24,16 @@ export default function Login() {
 
     try {
       if (!rawInput.includes('@')) {
-        const { data: profileData, error: profileErr } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('employee_id', rawInput)
-          .maybeSingle()
+        // دالة آمنة في قاعدة البيانات ترجّع إيميل الدخول لكود موظف واحد فقط (بدون فتح جدول profiles للعامة)
+        const { data: lookupEmail, error: lookupErr } = await supabase.rpc('login_email_for', {
+          p_identifier: rawInput,
+        })
 
-        if (profileErr) {
-          console.error('Profile lookup error:', profileErr)
+        if (lookupErr) {
+          console.error('Email lookup error:', lookupErr)
         }
 
-        if (profileData && profileData.email) {
-          loginIdentifier = profileData.email.trim()
-        } else {
-          loginIdentifier = `emp_${rawInput}@alesraa.com`
-        }
+        loginIdentifier = lookupEmail ? String(lookupEmail).trim() : `emp_${rawInput}@alesraa.com`
       }
 
       const { error: signErr } = await signIn(loginIdentifier, password)
@@ -46,11 +41,14 @@ export default function Login() {
       
       if (signErr) {
         console.error('Sign in error details:', signErr)
-        setError(
-          signErr.message === 'Invalid login credentials'
-            ? 'Employee ID / Email or password is incorrect.'
-            : signErr.message
-        )
+        const message = signErr.message || ''
+        if (message === 'Invalid login credentials') {
+          setError('Employee ID / Email or password is incorrect.')
+        } else if (/banned/i.test(message)) {
+          setError('This account has been deactivated. Please contact HR.')
+        } else {
+          setError(message)
+        }
         return
       }
       navigate('/')
@@ -139,8 +137,7 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="text-center mt-6 pt-5 border-t border-white/10 text-[11px] text-gray-400 flex justify-between items-center">
-          <span>Default Password: <strong className="text-white font-mono">123456</strong></span>
+        <div className="text-center mt-6 pt-5 border-t border-white/10 text-[11px] text-gray-400">
           <span>© {new Date().getFullYear()} ALESRAA</span>
         </div>
       </div>
