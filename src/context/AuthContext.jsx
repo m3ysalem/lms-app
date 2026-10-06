@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import ForcePasswordChange from '../components/ForcePasswordChange'
 
 const AuthContext = createContext(null)
 
@@ -88,6 +89,8 @@ export function AuthProvider({ children }) {
     setProfile(null)
   }
 
+  const refreshProfile = () => session?.user && loadProfile(session.user)
+
   const value = {
     session,
     user: session?.user ?? null,
@@ -96,10 +99,25 @@ export function AuthProvider({ children }) {
     loading,
     signIn,
     signOut,
-    refreshProfile: () => session?.user && loadProfile(session.user),
+    refreshProfile,
   }
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  // أول دخول (أو بعد إعادة تعيين الباسورد من الأدمن): إجبار تغيير كلمة المرور قبل عرض الموقع
+  const mustChangePassword = !!session && profile?.must_change_password === true
+  // أثناء تحميل بيانات المستخدم بعد تسجيل الدخول لا نعرض الموقع حتى لا يظهر للحظة قبل شاشة التغيير
+  const waitingForProfile = !!session && !profile
+
+  return (
+    <AuthContext.Provider value={value}>
+      {waitingForProfile ? (
+        <div className="min-h-screen flex items-center justify-center bg-[#0d0f12] text-gray-300 text-sm">Loading…</div>
+      ) : mustChangePassword ? (
+        <ForcePasswordChange fullName={profile?.full_name} onDone={refreshProfile} onSignOut={signOut} />
+      ) : (
+        children
+      )}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {
