@@ -450,6 +450,27 @@ export async function setEmployeePassword(userId, password) {
   return data
 }
 
+// تعطيل / إعادة تفعيل / حذف موظف نهائياً (عبر Edge Function آمنة تحظر الدخول فعلياً)
+export async function manageEmployee(userId, action) {
+  const { data, error } = await supabase.functions.invoke('manage-employee', {
+    body: { user_id: userId, action },
+  })
+
+  if (error) {
+    let message = error.message
+    try {
+      const body = await error.context.json()
+      if (body?.error) message = body.error
+    } catch {
+      // نستخدم الرسالة الافتراضية
+    }
+    throw new Error(message)
+  }
+
+  if (data?.error) throw new Error(data.error)
+  return data
+}
+
 export async function listDepartments() {
   const { data, error } = await supabase.from('departments').select('*')
   if (error) return []
