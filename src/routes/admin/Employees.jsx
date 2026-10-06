@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react'
 import Papa from 'papaparse'
 import { supabase } from '../../lib/supabaseClient'
-import { listEmployees, updateEmployee, updateEmployeeProfile, createEmployee as createEmployeeAccount, setEmployeePassword } from '../../lib/api'
+import { listEmployees, updateEmployeeProfile, createEmployee as createEmployeeAccount, setEmployeePassword, manageEmployee } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { Badge, Spinner } from '../../components/Ui'
 import { DEPARTMENTS_LIST } from '../../lib/departments'
@@ -137,33 +137,27 @@ export default function Employees() {
     }
   }
 
+  // تعطيل / إعادة تفعيل: بيحظر تسجيل الدخول فعلياً مع الحفاظ على سجلات التدريب
   const toggleActive = async (emp) => {
-    await updateEmployee(emp.id, { is_active: !emp.is_active })
-    refresh()
-  }
-
-  // تم تحديث دالة الحذف لتحاول مسح المستخدم من الـ Auth عبر دالة RPC أو الحذف المباشر المتاح
-  const deleteEmployee = async (emp) => {
-    if (!window.confirm(`Are you sure you want to delete employee: ${emp.full_name}?`)) {
+    if (emp.is_active && !window.confirm(`Deactivate ${emp.full_name}? They will not be able to sign in, but their training records are kept.`)) {
       return
     }
-
     try {
-      // 1. محاولة حذف المستخدم من جدول auth باستخدام دالة RPC (إذا كنت قد أنشأتها في قاعدة البيانات) أو الحذف من البروفايل
-      const { error: rpcError } = await supabase.rpc('delete_user_by_id', { target_user_id: emp.id })
-      
-      // لو مفيش RPC مخصص، نقوم بالحذف المباشر من جدول profiles (والذي سيمنع ظهوره في اللوحة)
-      if (rpcError) {
-        const { error } = await supabase
-          .from('profiles')
-          .delete()
-          .eq('id', emp.id)
+      await manageEmployee(emp.id, emp.is_active ? 'deactivate' : 'reactivate')
+      await refresh()
+    } catch (err) {
+      alert('Failed to update the account: ' + err.message)
+    }
+  }
 
-        if (error) throw error
-      }
-
-      // تحديث القائمة بعد الحذف بنجاح
-      refresh()
+  // حذف نهائي: بيمسح الحساب وكل سجلات تدريب الموظف (الأفضل Deactivate للحفاظ على السجلات)
+  const deleteEmployee = async (emp) => {
+    if (!window.confirm(`Permanently delete ${emp.full_name}?\n\nThis removes the account AND all of their training records, progress and certificates. This cannot be undone.\n\nTip: use "Deactivate" to keep the records.`)) {
+      return
+    }
+    try {
+      await manageEmployee(emp.id, 'delete')
+      await refresh()
     } catch (err) {
       alert('Failed to delete employee: ' + err.message)
     }
@@ -188,7 +182,7 @@ export default function Employees() {
     }
     try {
       await setEmployeePassword(emp.id, newPassword)
-      alert(`Password updated for ${emp.full_name}.`)
+      alert(`Password updated for ${emp.full_name}. They will be asked to choose a new password at their next sign-in.`)
     } catch (err) {
       alert('Failed to set password: ' + err.message)
     }
